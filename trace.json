@@ -1,0 +1,335 @@
+{
+  "index": [
+    {
+      "name": "Prior Auth Review Agent",
+      "role": "payer",
+      "key_alg": "ed25519",
+      "agent_id": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "endpoint": "inproc://payer",
+      "issued_at": 1795223689,
+      "synthetic": true,
+      "public_key": "gqdmkQYUIxG5NAkh1SB+F9afgbapWneoMpXvqSA1Kgg=",
+      "capabilities": [
+        "prior-auth.review",
+        "fhir.pas"
+      ],
+      "organization": "Example Health Plan"
+    },
+    {
+      "name": "Riverside Health PA Agent",
+      "role": "provider",
+      "key_alg": "ed25519",
+      "agent_id": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "endpoint": "inproc://provider",
+      "issued_at": 1795223689,
+      "synthetic": true,
+      "public_key": "YGPG3S7NjBtpE6LAqSfrVfvPAhvFovDG5bf3ZvlU+K8=",
+      "capabilities": [
+        "prior-auth.submit",
+        "fhir.pas"
+      ],
+      "organization": "Riverside Health System"
+    }
+  ],
+  "messages": [
+    {
+      "id": "d98aa3d9",
+      "thread_id": "f9633e45",
+      "from": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "type": "pa.submit",
+      "ts": 1795223902.330542,
+      "body": {
+        "summary": "PA request: MRI lumbar spine w/o contrast for Maria Lopez (synthetic)",
+        "patient": {
+          "id": "pt-1001",
+          "name": "Maria Lopez (synthetic)",
+          "dob": "1971-03-14",
+          "member_id": "HLT-88231"
+        },
+        "conditions": [
+          {
+            "code": "M54.16",
+            "system": "ICD-10",
+            "display": "Lumbar radiculopathy"
+          }
+        ],
+        "service_request": {
+          "code": "72148",
+          "system": "CPT",
+          "display": "MRI lumbar spine w/o contrast"
+        },
+        "red_flags": [],
+        "documents": [
+          {
+            "type": "progress-note",
+            "date": "2026-11-12",
+            "text": "Radicular pain L5 distribution x 9 weeks. Positive straight leg raise. No red flags."
+          },
+          {
+            "type": "pt-notes",
+            "date": "2026-11-05",
+            "text": "Physical therapy 2x/week for 7 weeks. Minimal improvement.",
+            "conservative_therapy_weeks": 7
+          }
+        ]
+      },
+      "sig": "zVZ9VlMjiRqDUSoF5FEdq9DmjqwkDO091KtM3AP7iOCql7X5dopz1Vem9o+wka6FQX5NPmn8Dwf2wklHBwoECw=="
+    },
+    {
+      "id": "42c5d857",
+      "thread_id": "f9633e45",
+      "from": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "type": "pa.decision",
+      "ts": 1795223903.1420019,
+      "body": {
+        "status": "APPROVED",
+        "summary": "7 weeks conservative therapy documented; auth AUTH-331299",
+        "auth_number": "AUTH-331299"
+      },
+      "sig": "zVLrj0oyfPGFUEIywEI/rL423GofuIeKN7jkhcRrMB/P7zkFCPy2xPKJHFOcWLRI5lLvCuUE/WZGTHgxqXQwDg=="
+    },
+    {
+      "id": "ad0d470a",
+      "thread_id": "3dbb5371",
+      "from": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "type": "pa.submit",
+      "ts": 1795223904.109442,
+      "body": {
+        "summary": "PA request: MRI lumbar spine w/o contrast for James Carter (synthetic)",
+        "patient": {
+          "id": "pt-1002",
+          "name": "James Carter (synthetic)",
+          "dob": "1965-08-02",
+          "member_id": "HLT-44019"
+        },
+        "conditions": [
+          {
+            "code": "M54.16",
+            "system": "ICD-10",
+            "display": "Lumbar radiculopathy"
+          }
+        ],
+        "service_request": {
+          "code": "72148",
+          "system": "CPT",
+          "display": "MRI lumbar spine w/o contrast"
+        },
+        "red_flags": [],
+        "documents": [
+          {
+            "type": "progress-note",
+            "date": "2026-11-15",
+            "text": "Persistent radicular pain x 8 weeks despite therapy. Considering surgical consult."
+          }
+        ]
+      },
+      "sig": "jY8u2Iaqj0N04TxxxvmB8yiTI3UohYeI3ozdhx9ddK1ccyyXlgxYSQNRXDa+NC0tGh03G8PrnMke/2pHktHCCA=="
+    },
+    {
+      "id": "86da0251",
+      "thread_id": "3dbb5371",
+      "from": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "type": "pa.decision",
+      "ts": 1795223904.917834,
+      "body": {
+        "status": "PENDED",
+        "summary": "need documentation of conservative therapy (pt-notes)",
+        "requested_items": [
+          {
+            "doc_type": "pt-notes",
+            "reason": "\u22656 weeks documented conservative therapy, or red-flag symptoms"
+          }
+        ]
+      },
+      "sig": "Zi+dMqsxtYfGTW7jhca+lN92vBg16KoSapodKitP0YURWtkn4ecZXsuae9C49BU/jhg1RnJAWDQ3pYLiwHGhBg=="
+    },
+    {
+      "id": "60f58ddc",
+      "thread_id": "3dbb5371",
+      "from": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "type": "pa.additional-info",
+      "ts": 1795224044.62916,
+      "body": {
+        "summary": "additional info: 1 document(s)",
+        "documents": [
+          {
+            "type": "pt-notes",
+            "date": "2026-11-10",
+            "text": "Completed 6 weeks of PT and NSAIDs. Symptoms unchanged.",
+            "conservative_therapy_weeks": 6
+          }
+        ]
+      },
+      "sig": "pF2BLzIERoUIy67DaIM8u9e1NFU1NRMduu2Hep9vqxDs2KknZSmzI48ZBtqL7vj2xnJFDvIIjifXkFTuZmzOCw=="
+    },
+    {
+      "id": "78346309",
+      "thread_id": "3dbb5371",
+      "from": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "type": "pa.decision",
+      "ts": 1795224045.4564779,
+      "body": {
+        "status": "APPROVED",
+        "summary": "6 weeks conservative therapy documented; auth AUTH-826463",
+        "auth_number": "AUTH-826463"
+      },
+      "sig": "KKeykDDMv0aGWDZqme+SiYiJIYumSocrRGjSd1GQpiRHpLdfOyOka60tqwiui7JySbkCNU5ogDm/xmal3cVSCg=="
+    },
+    {
+      "id": "a7df0a96",
+      "thread_id": "0bd4c03a",
+      "from": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "type": "pa.submit",
+      "ts": 1795224046.5753741,
+      "body": {
+        "summary": "PA request: MRI lumbar spine w/o contrast for Aisha Khan (synthetic)",
+        "patient": {
+          "id": "pt-1003",
+          "name": "Aisha Khan (synthetic)",
+          "dob": "1988-11-30",
+          "member_id": "HLT-77502"
+        },
+        "conditions": [
+          {
+            "code": "M54.50",
+            "system": "ICD-10",
+            "display": "Low back pain, unspecified"
+          }
+        ],
+        "service_request": {
+          "code": "72148",
+          "system": "CPT",
+          "display": "MRI lumbar spine w/o contrast"
+        },
+        "red_flags": [],
+        "documents": [
+          {
+            "type": "progress-note",
+            "date": "2026-11-17",
+            "text": "Acute low back pain x 10 days after lifting. No neuro deficits. No red flags. No therapy yet.",
+            "conservative_therapy_weeks": 0
+          }
+        ]
+      },
+      "sig": "bg4Y68mE18GDEDtFcO8j93s/iDzO5wQk8M4Hi8QuniOHz0Xk/VAteToghjc0gaGv4S6PzjieAaxxMxYw6RY/Cw=="
+    },
+    {
+      "id": "6f96c592",
+      "thread_id": "0bd4c03a",
+      "from": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "type": "pa.decision",
+      "ts": 1795224049.9266188,
+      "body": {
+        "status": "DENIED",
+        "summary": "Only 0 weeks of conservative therapy documented; policy requires 6.",
+        "reason_code": "MED-NEC-01",
+        "appeal_rights": true,
+        "reviewed_by": "clinician"
+      },
+      "sig": "3/JUGh86WFDxtPTOXZBrIUSQvcMDUlMaoZYqQjMjyN2PamCxTx2JGXUwdh830pTyQ1ru+C1JFuGKUPMhVpPhAQ=="
+    },
+    {
+      "id": "f0325a6c",
+      "thread_id": "6fafc4a4",
+      "from": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "type": "pa.submit",
+      "ts": 1795224050.970627,
+      "body": {
+        "summary": "PA request: MRI lumbar spine (forged clinical note)",
+        "patient": {
+          "id": "pt-9999",
+          "name": "Unknown",
+          "dob": "1980-01-01",
+          "member_id": "HLT-00000"
+        },
+        "conditions": [
+          {
+            "code": "M54.16",
+            "system": "ICD-10"
+          }
+        ],
+        "service_request": {
+          "code": "72148",
+          "system": "CPT",
+          "display": "MRI lumbar spine"
+        },
+        "red_flags": [
+          "fabricated"
+        ],
+        "documents": [
+          {
+            "type": "pt-notes",
+            "text": "forged",
+            "conservative_therapy_weeks": 12
+          }
+        ]
+      },
+      "sig": "QlpFSjKZPOOVyz/ib9VkVoJWdrN6g+1OvBjHFqPl5GEezTGRAsNLsP+uqfTvoxweEmzEelSp5mHaNBo5FyvcBw=="
+    },
+    {
+      "id": "a3dd1206",
+      "thread_id": "6fafc4a4",
+      "from": "urn:air:host39.org:personal:halhackpapayer@inkboxmail.com",
+      "to": "urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com",
+      "type": "pa.rejected",
+      "ts": 1795224051.794945,
+      "body": {
+        "status": "REJECTED",
+        "summary": "identity check failed: signature does not match sender's published key"
+      },
+      "sig": "v9RVNb0DeaWcjspggu2PGkQbYGeqt3LyuQLUXB8qjvVIFGpm6Xvq+BtXxUxsStNIkhY/PgEnTIx1lGFUBJLhAA=="
+    }
+  ],
+  "human_touches": [
+    {
+      "who": "Provider UM coordinator",
+      "question": "Release 1 additional clinical document(s) to Example Health Plan?",
+      "approved": true
+    },
+    {
+      "who": "Payer clinician reviewer (MD)",
+      "question": "Agent proposes DENIAL of MRI lumbar spine for Aisha Khan (synthetic). Type y to CONFIRM the denial, n to OVERTURN it (approve the MRI).",
+      "approved": true
+    },
+    {
+      "who": "Payer security analyst",
+      "question": "Rejected message claiming to be urn:air:host39.org:personal:halhackpaprovider@inkboxmail.com: signature does not match sender's published key",
+      "approved": null
+    }
+  ],
+  "results": [
+    {
+      "scenario": "A",
+      "status": "APPROVED",
+      "messages": 2,
+      "human_touches": 0
+    },
+    {
+      "scenario": "B",
+      "status": "APPROVED",
+      "messages": 4,
+      "human_touches": 1
+    },
+    {
+      "scenario": "C",
+      "status": "DENIED",
+      "messages": 2,
+      "human_touches": 1
+    },
+    {
+      "scenario": "S",
+      "status": "REJECTED",
+      "messages": 2,
+      "human_touches": 1
+    }
+  ]
+}
