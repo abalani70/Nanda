@@ -83,13 +83,24 @@ def find_envelope(parts) -> dict | None:
 
 # ======================================================================= server
 class A2AServer:
-    """Wraps an agent exposing ``handle(envelope) -> envelope`` as an A2A JSON-RPC server."""
+    """Wraps an agent exposing ``handle(envelope) -> envelope`` as an A2A JSON-RPC server.
+
+    Tasks are bound to the signed sender that opened them and to the envelope thread they
+    carry; only that sender can continue a task, one continuation at a time. Finished tasks
+    are kept (bounded, oldest first) without their clinical content.
+    """
+
+    MAX_TASKS = 500          # retained tasks; oldest finished ones are dropped first
+    MAX_SEEN = 2000          # remembered messageIds for duplicate detection
 
     def __init__(self, agent, skills: list[dict], description: str, on_request=None):
         self.agent = agent
         self.on_request = on_request          # optional hook(env) before the agent runs
-        self.tasks: dict[str, dict] = {}
-        self._owner: dict[str, str] = {}      # taskId -> sender agent id
+        self.tasks: dict[str, dict] = {}      # taskId -> task (insertion ordered)
+        self._meta: dict[str, dict] = {}      # taskId -> {"owner", "thread"}
+        self._threads: dict[str, str] = {}    # envelope thread_id -> taskId
+        self._seen: dict[tuple, str] = {}     # (sender, messageId) -> taskId
+        self.active = 0                       # requests being processed right now
         self._lock = threading.Lock()
         f = agent.facts
         self.card = {
@@ -105,83 +116,160 @@ class A2AServer:
             "skills": skills,
         }
 
+    def clear(self) -> None:
+        with self._lock:
+            self.tasks.clear(); self._meta.clear(); self._threads.clear(); self._seen.clear()
+
     # ------------------------------------------------------------- JSON-RPC
     def handle_rpc(self, req, version: str | None) -> dict:
         rid = req.get("id") if isinstance(req, dict) else None
+        if not isinstance(rid, (str, int, type(None))) or isinstance(rid, bool):
+            rid = None
         try:
             if not isinstance(req, dict) or req.get("jsonrpc") != "2.0" or not isinstance(req.get("method"), str):
                 raise A2AError(INVALID_REQUEST, "not a JSON-RPC 2.0 request")
             if (version or "0.3") != A2A_VERSION:
                 raise A2AError(VERSION_NOT_SUPPORTED, f"A2A-Version {version or '(empty = 0.3)'} not supported; use {A2A_VERSION}")
             params = req.get("params") or {}
+            if not isinstance(params, dict):
+                raise A2AError(INVALID_PARAMS, "params must be an object")
             if req["method"] == "SendMessage":
                 result = {"task": self._send_message(params)}
             elif req["method"] == "GetTask":
-                result = {**self._get_task(params)}
+                result = self._get_task(params)
             else:
                 raise A2AError(METHOD_NOT_FOUND, f"method {req['method']!r} not supported")
             return {"jsonrpc": "2.0", "id": rid, "result": result}
         except A2AError as e:
             return {"jsonrpc": "2.0", "id": rid, "error": {"code": e.code, "message": e.message}}
+        except Exception:  # never drop a request without a JSON-RPC answer
+            return {"jsonrpc": "2.0", "id": rid, "error": {"code": INTERNAL_ERROR, "message": "internal error"}}
+
+    @staticmethod
+    def _str_id(value, name: str):
+        if value is not None and not isinstance(value, str):
+            raise A2AError(INVALID_PARAMS, f"{name} must be a string")
+        return value
 
     def _get_task(self, params) -> dict:
-        task = self.tasks.get(params.get("id")) if isinstance(params, dict) else None
-        if task is None:
-            raise A2AError(TASK_NOT_FOUND, "task not found")
-        return task
+        """GetTask carries no signed identity, so it only reveals the task's state.
+
+        History, artifacts and the decision (all of which hold clinical data) go only to
+        the signed sender, in SendMessage replies.
+        """
+        task_id = self._str_id(params.get("id"), "id")
+        with self._lock:
+            task = self.tasks.get(task_id) if task_id else None
+            if task is None:
+                raise A2AError(TASK_NOT_FOUND, "task not found")
+            return {"id": task["id"], "contextId": task["contextId"],
+                    "status": {"state": task["status"]["state"], "timestamp": task["status"].get("timestamp")}}
 
     def _send_message(self, params) -> dict:
-        msg = params.get("message") if isinstance(params, dict) else None
-        if not isinstance(msg, dict) or msg.get("role") != "ROLE_USER" or not msg.get("messageId") \
-                or not isinstance(msg.get("parts"), list):
+        msg = params.get("message")
+        if not isinstance(msg, dict) or msg.get("role") != "ROLE_USER" or not isinstance(msg.get("parts"), list):
             raise A2AError(INVALID_PARAMS, "message needs messageId, role ROLE_USER and parts")
+        message_id = self._str_id(msg.get("messageId"), "messageId")
+        task_id = self._str_id(msg.get("taskId"), "taskId")
+        context_id = self._str_id(msg.get("contextId"), "contextId")
+        if not message_id:
+            raise A2AError(INVALID_PARAMS, "message needs a messageId")
         env = find_envelope(msg["parts"])
         if env is None:
             raise A2AError(CONTENT_TYPE_NOT_SUPPORTED, f"expected a {ENVELOPE_MEDIA_TYPE} data part")
-        task_id = msg.get("taskId")
+        sender, thread = env.get("from"), env.get("thread_id")
+        if not isinstance(sender, str) or not isinstance(thread, str):
+            raise A2AError(INVALID_PARAMS, "envelope needs from and thread_id")
+
         with self._lock:
-            existing = self.tasks.get(task_id) if task_id else None
-        if task_id:
-            # Don't reveal tasks the sender doesn't own (spec §3.3.2: not found == not authorized)
-            if existing is None or self._owner.get(task_id) != env.get("from"):
-                raise A2AError(TASK_NOT_FOUND, "task not found")
-            if existing["status"]["state"] != "TASK_STATE_INPUT_REQUIRED":
-                raise A2AError(UNSUPPORTED_OPERATION, f"task is {existing['status']['state']}")
-            if msg.get("contextId") and msg["contextId"] != existing["contextId"]:
-                raise A2AError(INVALID_PARAMS, "contextId does not match the task")
-        context_id = existing["contextId"] if existing else (msg.get("contextId") or _id())
-
-        if self.on_request:
-            self.on_request(env)
-        try:
-            reply = self.agent.handle(env)
-        except Exception as e:  # the agent failed (e.g. no human answered): fail the task, not the call
-            reply = None
-            failure = str(e)
-
-        # A rejected caller never gets to touch an existing task: it gets its own rejected task.
-        if reply is not None and reply["body"].get("status") == "REJECTED":
+            # Duplicate delivery of a message we already processed: return the same task.
+            done = self._seen.get((sender, message_id))
+            if done and done in self.tasks:
+                return self._public(self.tasks[done])
             existing = None
+            if task_id:
+                existing = self.tasks.get(task_id)
+                meta = self._meta.get(task_id, {})
+                # Not found == not yours (spec §3.3.2): don't reveal other senders' tasks.
+                if existing is None or meta.get("owner") != sender:
+                    raise A2AError(TASK_NOT_FOUND, "task not found")
+                if meta.get("thread") != thread:
+                    raise A2AError(INVALID_PARAMS, "envelope thread does not belong to this task")
+                if context_id and context_id != existing["contextId"]:
+                    raise A2AError(INVALID_PARAMS, "contextId does not match the task")
+                if existing["status"]["state"] != "TASK_STATE_INPUT_REQUIRED":
+                    raise A2AError(UNSUPPORTED_OPERATION, f"task is {existing['status']['state']}")
+                existing["status"] = {"state": "TASK_STATE_WORKING", "timestamp": _now()}  # claim it
+            elif thread in self._threads:
+                # This conversation already has a task: follow-ups must name it.
+                raise A2AError(INVALID_PARAMS, "this thread already has a task; continue it with taskId")
+            self.active += 1
+
+        try:
+            if self.on_request:
+                self.on_request(env)
+            failure = None
+            try:
+                reply = self.agent.handle(env)
+            except Exception as e:  # the agent failed (e.g. no human answered): fail the task
+                reply, failure = None, str(e)
+            return self._record(msg, env, existing, context_id, reply, failure)
+        finally:
+            with self._lock:
+                self.active -= 1
+
+    def _record(self, msg, env, existing, context_id, reply, failure) -> dict:
+        sender, thread = env["from"], env["thread_id"]
+        rejected = reply is not None and reply["body"].get("status") == "REJECTED"
         with self._lock:
-            task = existing or {"id": _id(), "contextId": context_id,
+            if existing is not None and rejected:
+                # A rejected message never changes an existing task; put the task back.
+                existing["status"] = {"state": "TASK_STATE_INPUT_REQUIRED", "timestamp": _now()}
+                existing = None
+            task = existing or {"id": _id(), "contextId": context_id or _id(),
                                 "status": {"state": "TASK_STATE_SUBMITTED"}, "artifacts": [], "history": []}
-            task["history"].append({**msg, "taskId": task["id"], "contextId": task["contextId"]})
             if reply is None:
-                state = "TASK_STATE_FAILED"
-                parts = [{"text": f"task failed: {failure}"}]
+                state, parts = "TASK_STATE_FAILED", [{"text": f"task failed: {failure}"}]
             else:
                 state = STATE_FOR.get(reply["body"].get("status"), "TASK_STATE_FAILED")
                 parts = [envelope_part(reply), {"text": reply["body"].get("summary", "")}]
             status_msg = {"messageId": _id(), "contextId": task["contextId"], "taskId": task["id"],
                           "role": "ROLE_AGENT", "parts": parts}
             task["status"] = {"state": state, "message": status_msg, "timestamp": _now()}
+            task["history"].append({**msg, "taskId": task["id"], "contextId": task["contextId"]})
             task["history"].append(status_msg)
             if state == "TASK_STATE_COMPLETED":
                 task["artifacts"] = [{"artifactId": _id(), "name": "prior-auth-decision",
                                       "parts": [{"data": reply["body"], "mediaType": "application/json"}]}]
             self.tasks[task["id"]] = task
-            self._owner.setdefault(task["id"], env.get("from"))
-            return json.loads(json.dumps(task))   # snapshot
+            if not rejected:
+                self._meta.setdefault(task["id"], {"owner": sender, "thread": thread})
+                self._threads[thread] = task["id"]
+            self._seen[(sender, msg["messageId"])] = task["id"]
+            result = self._public(task)
+            if state in TERMINAL:
+                # The reply above went to the signed sender; keep only the outcome from here on.
+                task["history"], task["artifacts"] = [], []
+                task["status"] = {"state": state, "timestamp": task["status"]["timestamp"]}
+                if not rejected and hasattr(self.agent, "forget"):
+                    self.agent.forget(thread)
+            self._trim()
+            return result
+
+    @staticmethod
+    def _public(task: dict) -> dict:
+        return json.loads(json.dumps(task))   # snapshot
+
+    def _trim(self) -> None:
+        while len(self.tasks) > self.MAX_TASKS:
+            victim = next((tid for tid, t in self.tasks.items() if t["status"]["state"] in TERMINAL),
+                          next(iter(self.tasks)))
+            self.tasks.pop(victim)
+            meta = self._meta.pop(victim, None)
+            if meta and self._threads.get(meta["thread"]) == victim:
+                self._threads.pop(meta["thread"])
+        while len(self._seen) > self.MAX_SEEN:
+            self._seen.pop(next(iter(self._seen)))
 
 
 def serve(server: A2AServer, host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:
@@ -189,6 +277,8 @@ def serve(server: A2AServer, host: str = "127.0.0.1", port: int = 8765) -> Threa
     rpc_path = urlsplit(server.card["supportedInterfaces"][0]["url"]).path or "/"
 
     class Handler(BaseHTTPRequestHandler):
+        timeout = 15   # seconds; a stalled client can't hold a thread forever
+
         def _json(self, code, obj, extra=None):
             out = json.dumps(obj).encode()
             self.send_response(code)

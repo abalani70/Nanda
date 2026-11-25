@@ -58,8 +58,9 @@ def main():
     oversight = Oversight(interactive=args.interactive,
                           scripted={"confirm_denial": not args.clinician_overrides,
                                     "release_phi": True})
-    transport = a2a.A2AClient()
     endpoint = f"http://127.0.0.1:{args.port}/a2a" if args.http else "inproc://payer"
+    # Only our own payer endpoint may receive requests, whatever an index entry says.
+    transport = a2a.A2AClient(allowed={endpoint})
 
     if args.mock_index and not args.register:
         index = MockIndex()

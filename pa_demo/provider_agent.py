@@ -117,6 +117,8 @@ class SpoofedProvider:
             "red_flags": ["fabricated"],
             "documents": [{"type": "pt-notes", "text": "forged", "conservative_therapy_weeks": 12}],
         }
+        if hasattr(self.transport, "agent_card"):
+            self.transport.agent_card(payer["endpoint"])   # the card is public: attackers read it too
         env = seal(self.claimed_id, payer["agent_id"], "pa.submit", body, self.keys)
         c.send(env, "Rogue agent (claims Riverside)", "Payer agent")
         reply = self.transport(env, payer["endpoint"])

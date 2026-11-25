@@ -290,14 +290,15 @@ class App:
     def reset(self) -> bool:
         # Same lock as new_case, so a task can't start between the check and the clear.
         with self.log.lock:
-            if self.oversight.pending or any(cs["running"] for cs in self.log.cases.values()):
+            if (self.oversight.pending or self.a2a_server.active
+                    or any(cs["running"] for cs in self.log.cases.values())):
                 return False
             self.log.events.clear()
             self.log.cases.clear()
             self.transport.trace.clear()
             self.transport.frames.clear()
             self.log.thread_case.clear()
-            self.a2a_server.tasks.clear()
+            self.a2a_server.clear()
             self.oversight.touches.clear()
             self.payer.cases.clear()   # drop the insurer's copies of the clinical documents
         return True
@@ -336,6 +337,8 @@ class App:
 
 def make_handler(app: App):
     class Handler(BaseHTTPRequestHandler):
+        timeout = 15   # seconds; a stalled client can't hold a thread forever
+
         def _send(self, code, payload, ctype="application/json"):
             out = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
             self.send_response(code)
