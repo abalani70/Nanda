@@ -300,11 +300,13 @@ h1 small{font-size:12.5px}
   .graph svg{max-height:none;min-height:0}
 }
 /* ---------- cryptographic identity ---------- */
+.provcard{margin:0 0 10px;font-size:12px}
+.provcard .chk{display:block;color:var(--ok);font-size:11.5px}
 .idcard{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:10px;font-size:11.5px;background:var(--soft)}
 .idcard .hd{font-weight:700;font-size:12px;margin-bottom:4px}
 .idcard .kv{display:grid;grid-template-columns:78px 1fr;gap:2px 8px;align-items:baseline}
 .idcard .k{color:var(--faint)}
-.idcard .v{word-break:break-all}
+.idcard .v{overflow-wrap:anywhere}
 .fp{font-family:ui-monospace,Menlo,monospace;font-weight:700;padding:0 5px;border-radius:5px;white-space:nowrap}
 .fp.ok{background:var(--ok-soft);color:var(--ok)} .fp.bad{background:var(--err-soft);color:var(--err)} .fp.n{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .authx{border:1.5px solid var(--payer);border-radius:14px;padding:10px 12px;margin:8px 0 4px;background:var(--card)}
@@ -346,7 +348,6 @@ h1 small{font-size:12.5px}
     <section class="card panel prov side">
       <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
       <div class="sub">Hand the task to your agent. It pulls the chart, finds the insurer's agent and negotiates with it. You're only asked about decisions that need a person.</div>
-      <div class="idcard" id="provId"></div>
       <div class="patients" id="patients"></div>
       <div class="chart" id="chart"></div>
       <div class="submit-row">
@@ -354,6 +355,9 @@ h1 small{font-size:12.5px}
         <span class="note" id="submitNote"></span>
       </div>
       <div id="provCps"></div>
+      <h3>Our agent's identity &amp; the A2A card it reads</h3>
+      <div class="idcard" id="provId"></div>
+      <div class="a2acard provcard" id="provCard"></div>
       <h3>Delegated tasks</h3>
       <div id="myReqs" class="tasks"></div>
       <div class="empty" id="myReqsEmpty">Nothing delegated yet.</div>
@@ -600,6 +604,7 @@ function drawCounts(){
   }
 }
 const NAMES = {provider:"Provider agent", payer:"Insurer agent", rogue:"Spoofed agent"};
+let lastCardFetch = null;   // most recent Agent Card read by the provider agent
 const signedBy = {};     // envelope id -> "signed" event (who signed, with which key)
 const verifs = [];       // "verified" events, newest first
 const shortFp = fp => fp ? fp.split(":").slice(0, 2).join(":") : "";
@@ -753,6 +758,7 @@ function apply(ev){
   }
   if (ev.kind === "index") lookups.unshift(ev);
   if (ev.kind === "signed") signedBy[ev.env_id] = ev;
+  if (ev.kind === "agent_card" && ev.by === "provider") lastCardFetch = ev;
   if (ev.kind === "verified") verifs.unshift({...ev, signer: signedBy[ev.env_id]});
   const c = cases[ev.case];
   if (!c) return;
@@ -809,6 +815,7 @@ function render(){
   }).join("");
 
   renderIdentity();
+  renderProvCard();
   renderAuth();
 
   // alerts
@@ -876,9 +883,21 @@ function taskCard(c){
 }
 const shorten = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
+function renderProvCard(){
+  const f = lastCardFetch, card = f ? f.card : boot.a2a.card, iface = f ? f.interface : card.supportedInterfaces[0];
+  const skills = (card.skills || []).map(sk => `<span class="tagx">skill: ${esc(sk.id)}</span>`).join("");
+  const when = f ? `read at ${new Date(f.ts * 1000).toLocaleTimeString()} for task #${f.case}` : "read before each request";
+  $("#provCard").innerHTML = `🪪 <b>A2A Agent Card our agent reads</b> <span style="color:var(--muted)">(${esc(when)})</span><br>
+    <a href="${esc(f ? f.url : boot.a2a.card_url)}" target="_blank" rel="noopener">${esc(f ? f.url : boot.a2a.card_url)}</a><br>
+    <b>${esc(card.name)}</b> · ${esc(card.provider ? card.provider.organization : "")}
+    <span class="tagx">${esc(iface.protocolBinding)} ${esc(iface.protocolVersion)}</span>${skills}
+    <span class="chk">✔ card's JSON-RPC URL matches the endpoint in the NANDA Index</span>
+    <span class="chk">✔ offers prior-auth.review, so our agent sends SendMessage</span>
+    <span style="color:var(--muted);font-size:11px">Our agent is an A2A <b>client</b>: it reads this card, then calls ${esc(iface.url)}.</span>`;
+}
 function renderIdentity(){
   const id = boot.identity, me = boot.agents.find(a => a.agent_id === id.provider);
-  $("#provId").innerHTML = `<div class="hd">🔐 Our agent's identity</div><div class="kv">
+  $("#provId").innerHTML = `<div class="hd">🔐 Riverside provider agent</div><div class="kv">
     <span class="k">Agent ID</span><span class="v mono">${esc(id.provider)}</span>
     <span class="k">Public key</span><span class="v">${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} <span class="fp n" title="${esc(me ? me.public_key : "")}">${esc(id.fingerprints[id.provider])}</span> · published in the NANDA Index</span>
     <span class="k">Private key</span><span class="v">${esc(id.key_storage)}; signs every message</span></div>`;
