@@ -53,7 +53,7 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
   message type and A2A operation or task state, decision, the key that signed it, the key the NANDA Index
   publishes for that agent ID, and whether verification passed (genuine / forged / altered / unknown agent).
   A spoof shows a different signer key (forged) or no published key. Click a row to select its task.
-- Spoofed agent (strip under the graph): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
+- Spoofed agent (second tab on the left, next to Provider overseer): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected. The tab shows the attacker's agent ID and the public key it actually signed with, and every attempt. While you are on it, the Provider tab flags any approval waiting for you.
 - `/api/trace` (the **trace.json** button) gives every signed envelope and raw A2A JSON-RPC request/response.
 
 ## Scenarios

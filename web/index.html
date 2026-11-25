@@ -255,7 +255,7 @@ h3{font-size:11px}
 html,body{height:100%}
 .wrap{max-width:none;height:100vh;display:flex;flex-direction:column;gap:10px;padding:12px 14px}
 header{flex:none;margin:0;padding:10px 18px;border-radius:16px;flex-wrap:nowrap}
-@media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px} .striphd .sub{display:none}}
+@media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px}}
 h1{font-size:20px}
 h1 small{font-size:12.5px}
 .stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,1fr) minmax(560px,2.4fr) minmax(260px,1fr);gap:12px}
@@ -267,23 +267,17 @@ h1 small{font-size:12.5px}
 .center .stat .l{font-size:11.5px}
 .center .stat::after{width:60px;height:60px;right:-16px;top:-16px}
 .center .graph{margin:0;flex:none;padding:6px 6px 0}
-.graph svg{max-height:calc(100vh - 650px);min-height:240px}
+.graph svg{max-height:calc(100vh - 500px);min-height:240px}
 .legend{padding:2px 12px 6px;gap:10px;font-size:11.5px}
 .ticker{padding:0 10px 10px;min-height:52px}
 .tx{width:200px;padding:5px 8px;font-size:11.5px}
 .center .tx .r2{display:none}
-.strip{flex:none;padding:10px 14px}
-.striphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.striphd h2{margin:0}
-.striphd .grow{flex:1}
-.strip .btn{padding:7px 12px}
 .attempts{display:flex;gap:8px;overflow-x:auto;margin-top:8px}
 .att{flex:0 0 auto;max-width:420px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:12px;cursor:pointer;animation:slidein .4s ease-out}
 .att.sel{border-color:var(--rogue);box-shadow:0 0 0 3px var(--rogue-soft)}
 .att .shield{width:28px;height:28px;font-size:14px;border-radius:8px}
 .att .t2{color:var(--muted)}
 .att .grow{min-width:0}
-.strip .empty{padding:6px 0 0}
 .side .sub{font-size:12px;margin-bottom:10px}
 .side h3{margin:12px 0 6px}
 .side .chart{font-size:12px;padding:8px 10px}
@@ -359,17 +353,14 @@ h1 small{font-size:12.5px}
 .side .track .stp .ic{width:22px;height:22px;font-size:11px}
 .side .track .stp::before{top:10px}
 .ptasks:empty{display:none}
-.stripbody{display:grid;grid-template-columns:170px minmax(0,1fr);gap:12px;align-items:start}
-.stripbody .striphd{flex-direction:column;align-items:stretch;gap:6px;flex-wrap:nowrap}
-.stripbody .striphd h2{font-size:14px;margin:0 0 2px}
-.stripbody .striphd .btn{padding:6px 8px;font-size:12px;text-align:center}
 .att{animation:none}
-.striphd .attempts{margin:2px 0 0;flex-direction:column;overflow:visible}
-.att.mini{padding:4px 8px;font-size:11px;font-weight:600;gap:6px;justify-content:space-between;max-width:none}
-.att.mini .badge{font-size:10px;padding:1px 6px}
-.idcard.mini{margin:0;font-size:10.5px;padding:6px 9px}
-.idcard.mini .kv{grid-template-columns:64px 1fr}
-.idcard.mini .hd{font-size:11.5px;color:var(--rogue)}
+.tabs{display:flex;gap:4px;margin:-4px -4px 12px;padding:3px;background:var(--soft);border-radius:12px}
+.tab{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:650;color:var(--muted);position:relative;white-space:nowrap}
+.tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.15)}
+.tab[data-tab="rogue"].on{color:var(--rogue)}
+.tabdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--human);margin-left:4px;vertical-align:1px;animation:pulse 1.2s infinite}
+.tabdot[hidden]{display:none}
+#tabRogue .attack .btn{width:100%}
 </style>
 </head>
 <body>
@@ -394,7 +385,12 @@ h1 small{font-size:12.5px}
 
   <div class="stage">
     <!-- PROVIDER (left) -->
-    <section class="card panel prov side">
+    <section class="card panel prov side" id="leftPanel">
+      <div class="tabs" role="tablist">
+        <button class="tab on" role="tab" data-tab="prov" id="tabBtnProv">🏥 Provider overseer <span class="tabdot" id="provDot" hidden></span></button>
+        <button class="tab" role="tab" data-tab="rogue" id="tabBtnRogue">🕵️ Spoofed agent</button>
+      </div>
+      <div id="tabProv">
       <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
       <div class="sub">Hand the task to your agent. It pulls the chart, finds the insurer's agent and negotiates with it. You're only asked about decisions that need a person.</div>
       <div class="submit-row top">
@@ -407,6 +403,20 @@ h1 small{font-size:12.5px}
       <h3>Our agent's identity &amp; the A2A card it reads</h3>
       <div class="idcard" id="provId"></div>
       <div class="a2acard provcard" id="provCard"></div>
+      </div>
+      <div id="tabRogue" hidden>
+        <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent · attacker</h2>
+        <div class="sub">Finds the insurer's endpoint in the public NANDA Index and sends a forged request with a fabricated clinical note. It can use any agent ID, but it can only sign with its own key.</div>
+        <div class="attack">
+          <button class="btn danger" data-attack="impersonate">Impersonate Riverside<small>uses Riverside's agent ID, signs with its own key</small></button>
+          <button class="btn ghost-danger" data-attack="unregistered">Unregistered agent<small>an agent ID that is not in the NANDA Index</small></button>
+        </div>
+        <h3>The attacker's identity</h3>
+        <div class="idcard" id="rogueId"></div>
+        <h3>Attempts</h3>
+        <div class="tasks" id="attempts"></div>
+        <div class="empty" id="attemptsEmpty">No attacks yet. Try one: both are stopped at the identity check.</div>
+      </div>
     </section>
 
     <!-- ANIMATION (center) -->
@@ -502,18 +512,6 @@ h1 small{font-size:12.5px}
       <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
     </div>
       <section class="card txlog" id="txlog"></section>
-      <section class="card panel rogue strip">
-        <div class="stripbody">
-          <div class="striphd">
-            <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
-            <button class="btn danger" data-attack="impersonate" title="Uses Riverside's agent ID, signs with its own key">Impersonate Riverside</button>
-            <button class="btn ghost-danger" data-attack="unregistered" title="An agent ID that is not in the NANDA Index">Unregistered agent</button>
-            <div class="attempts" id="attempts"></div>
-            <div class="empty" id="attemptsEmpty" style="padding:0;font-size:11px">No attacks yet.</div>
-          </div>
-          <div class="idcard mini" id="rogueId"></div>
-        </div>
-      </section>
     </main>
 
     <!-- INSURER (right) -->
@@ -884,10 +882,9 @@ function render(){
 
   // rogue attempts
   $("#attemptsEmpty").style.display = rogue.length ? "none" : "";
-  $("#attempts").innerHTML = rogue.slice(0, 1).map(c => {
-    const kind = c.attack === "impersonate" ? "Impersonation" : "Unregistered";
-    return `<div class="att mini ${c.id === selCase ? "sel" : ""}" data-case="${c.id}" title="${esc(c.label)}">${c.identity === "bad" ? "⛔" : "⏳"} #${c.id} ${esc(kind)} ${badge(c.status)}</div>`;
-  }).join("");
+  $("#attempts").innerHTML = rogue.map(c => taskCard(c)).join("");
+  // flag the Provider tab when it needs a person and the Spoofed tab is showing
+  $("#provDot").hidden = !(leftTab === "rogue" && Object.values(checkpoints).some(cp => cp.side === "provider"));
 
   // checkpoints
   const cps = Object.values(checkpoints);
@@ -1025,6 +1022,17 @@ function cpCard(cp){
 
 
 // ------------------------------------------------------------- actions
+let leftTab = "prov";
+function showTab(t){
+  leftTab = t;
+  $("#tabProv").hidden = t !== "prov"; $("#tabRogue").hidden = t !== "rogue";
+  $("#tabBtnProv").classList.toggle("on", t === "prov"); $("#tabBtnRogue").classList.toggle("on", t === "rogue");
+  $("#leftPanel").classList.toggle("prov", t === "prov"); $("#leftPanel").classList.toggle("rogue", t === "rogue");
+  try { localStorage.setItem("watchtower.leftTab", t); } catch (e) {}
+  if (boot) render();
+}
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+try { const t = localStorage.getItem("watchtower.leftTab"); if (t === "rogue" || t === "prov") showTab(t); } catch (e) {}
 $("#submitBtn").onclick = async () => {
   const b = $("#submitBtn"); b.disabled = true;
   const r = await api("/api/submit", {patient_id: selPatient}).catch(() => ({error: "can't reach the watchtower server"}));
