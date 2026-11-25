@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prior Auth Watchtower</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --ink:#1b1f24; --muted:#5d6570; --faint:#8b939d; --line:#dfe3e8; --soft:#eef1f4;
+  --prov:#2463d1; --prov-soft:#e6eefc; --payer:#0f8a6a; --payer-soft:#e2f4ee; --rogue:#c62f3a; --rogue-soft:#fbe6e8;
+  --index:#6b4fd0; --index-soft:#eeeafc; --human:#b77806; --human-soft:#fdf2dc;
+  --ok:#14804a; --ok-soft:#dff3e7; --warn:#a86200; --warn-soft:#fdf0d8; --err:#c0262f; --err-soft:#fbe3e4; --info:#2463d1; --info-soft:#e6eefc;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1216; --card:#171b21; --ink:#e7eaee; --muted:#a3abb5; --faint:#77808b; --line:#2a3039; --soft:#1f242b;
+    --prov:#6ea0ff; --prov-soft:#1a2740; --payer:#3fc79f; --payer-soft:#13302a; --rogue:#ff6b74; --rogue-soft:#3a1a1e;
+    --index:#a891ff; --index-soft:#251f40; --human:#f0b23f; --human-soft:#3a2d12;
+    --ok:#4ccf86; --ok-soft:#163222; --warn:#f0ac3c; --warn-soft:#3a2b10; --err:#ff6b74; --err-soft:#3d191c; --info:#6ea0ff; --info-soft:#1a2740;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer}
+.wrap{max-width:1360px;margin:0 auto;padding:16px}
+header{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;margin-bottom:14px}
+h1{font-size:20px;margin:0;letter-spacing:-.01em}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted);font-size:12px}
+.chip b{color:var(--ink);font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;padding:6px 10px;color:var(--muted);font-size:12px}
+.seg button.on{background:var(--ink);color:var(--card)}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:8px;font-size:13px}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--prov);border-color:var(--prov);color:#fff;font-weight:600}
+.btn.danger{background:var(--rogue);border-color:var(--rogue);color:#fff;font-weight:600}
+.btn.ghost-danger{color:var(--rogue);border-color:var(--rogue)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.stat{padding:10px 14px}
+.stat .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .l{font-size:12px;color:var(--muted)}
+.graph{padding:6px 6px 0;margin-bottom:12px;position:relative}
+.graph svg{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:14px;padding:4px 12px 10px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.cols{display:grid;grid-template-columns:1.25fr 1fr .85fr;gap:12px;margin-bottom:12px}
+.panel{padding:14px;min-width:0}
+.panel h2{font-size:15px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+.panel .sub{color:var(--muted);font-size:12px;margin-bottom:12px}
+.dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.panel.prov{border-top:3px solid var(--prov)} .panel.payer{border-top:3px solid var(--payer)} .panel.rogue{border-top:3px solid var(--rogue)}
+h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);margin:16px 0 8px}
+.patients{display:grid;gap:6px}
+.pt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;background:transparent;text-align:left;color:inherit;width:100%}
+.pt.on{border-color:var(--prov);background:var(--prov-soft)}
+.pt .r{width:14px;height:14px;border-radius:50%;border:2px solid var(--faint);margin-top:3px;flex:none}
+.pt.on .r{border-color:var(--prov);background:radial-gradient(var(--prov) 45%,transparent 50%)}
+.pt .n{font-weight:600} .pt .m{font-size:12px;color:var(--muted)}
+.chart{margin-top:10px;border:1px dashed var(--line);border-radius:10px;padding:10px;font-size:12.5px}
+.chart .row{display:flex;gap:8px;margin:2px 0} .chart .k{color:var(--faint);width:72px;flex:none}
+.doc{display:flex;gap:8px;align-items:baseline;padding:4px 0;border-top:1px solid var(--soft)}
+.doc .t{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--muted);flex:none;width:96px}
+.tag{font-size:10.5px;padding:1px 6px;border-radius:999px;background:var(--warn-soft);color:var(--warn);white-space:nowrap;flex:none}
+.submit-row{display:flex;gap:10px;align-items:center;margin-top:10px}
+.submit-row .note{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:4px 6px;border-bottom:1px solid var(--line)}
+td{padding:7px 6px;border-bottom:1px solid var(--soft);vertical-align:top}
+tr.sel td{background:var(--soft)} tbody tr{cursor:pointer}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+.s-APPROVED{background:var(--ok-soft);color:var(--ok)} .s-PENDED{background:var(--warn-soft);color:var(--warn)}
+.s-DENIED,.s-REJECTED{background:var(--err-soft);color:var(--err)} .s-ERROR{background:var(--soft);color:var(--muted)}
+.s-SUBMITTED,.s-IN_REVIEW{background:var(--info-soft);color:var(--info)}
+.s-AWAITING_HUMAN{background:var(--human-soft);color:var(--human);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.55}}
+.empty{color:var(--faint);font-size:12.5px;padding:8px 0}
+.cp{border:1.5px solid var(--human);background:var(--human-soft);border-radius:12px;padding:10px 12px;margin:8px 0}
+.cp .who{font-size:11px;font-weight:700;color:var(--human);text-transform:uppercase;letter-spacing:.05em}
+.cp .q{font-weight:600;margin:4px 0}
+.cp .d{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.cp .acts{display:flex;gap:8px;flex-wrap:wrap}
+.cp .yes{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.inbox .it{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--soft);cursor:pointer}
+.inbox .it .grow{flex:1;min-width:0}
+.inbox .it .t1{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inbox .it .t2{font-size:12px;color:var(--muted)}
+.id-ok{color:var(--ok);font-weight:700} .id-bad{color:var(--err);font-weight:700} .id-wait{color:var(--faint)}
+.alert{border-left:3px solid var(--err);background:var(--err-soft);padding:7px 10px;border-radius:6px;font-size:12.5px;margin:6px 0}
+.policy{font-size:12.5px;background:var(--soft);border-radius:8px;padding:8px 10px}
+.attack{display:grid;gap:8px}
+.attack .btn{text-align:left;padding:9px 12px}
+.attack .btn small{display:block;font-weight:400;opacity:.85;font-size:11.5px}
+.timeline{padding:14px}
+.timeline .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.ev{display:grid;grid-template-columns:54px 92px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--soft);font-size:13px;align-items:start}
+.ev .tm{color:var(--faint);font-variant-numeric:tabular-nums;font-size:12px}
+.actor{font-size:11px;font-weight:700;padding:1px 7px;border-radius:999px;text-align:center}
+.a-provider{background:var(--prov-soft);color:var(--prov)} .a-payer{background:var(--payer-soft);color:var(--payer)}
+.a-rogue{background:var(--rogue-soft);color:var(--rogue)} .a-index{background:var(--index-soft);color:var(--index)}
+.a-human{background:var(--human-soft);color:var(--human)} .a-system{background:var(--soft);color:var(--muted)}
+details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:2px}
+pre{margin:6px 0 0;background:var(--soft);padding:8px;border-radius:8px;overflow:auto;font-size:11.5px;max-height:260px}
+.ok-t{color:var(--ok)} .bad-t{color:var(--err)}
+/* svg */
+.n-box{stroke-width:2}
+.lbl{font-size:15px;font-weight:700;fill:var(--ink)}
+.lbl2{font-size:11px;fill:var(--muted)}
+.lbl3{font-size:10px;fill:var(--faint);font-family:ui-monospace,Menlo,monospace}
+.org{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:6 5}
+.orgl{font-size:11px;font-weight:700;letter-spacing:.08em;fill:var(--faint);text-transform:uppercase}
+.edge{fill:none;stroke:var(--line);stroke-width:2}
+.edge.hot{stroke:var(--faint)}
+.pk-l{font-size:11px;font-weight:700;paint-order:stroke;stroke:var(--card);stroke-width:4px;stroke-linejoin:round}
+.human-n circle,.human-n path{fill:var(--soft);stroke:var(--faint);stroke-width:1.5}
+.human-n.waiting circle,.human-n.waiting path{fill:var(--human-soft);stroke:var(--human);stroke-width:2.5}
+.human-n.waiting .ring{display:block}
+.human-n .ring{display:none;fill:none;stroke:var(--human);stroke-width:2;animation:ring 1.4s infinite;transform-box:fill-box;transform-origin:center}
+.human-n.alerted circle,.human-n.alerted path{fill:var(--err-soft);stroke:var(--err);stroke-width:2.5}
+@keyframes ring{0%{opacity:.9;transform:scale(1)}100%{opacity:0;transform:scale(1.6)}}
+.flash{animation:flash .9s ease-out}
+@keyframes flash{0%{filter:drop-shadow(0 0 0 transparent)}30%{filter:drop-shadow(0 0 10px currentColor)}100%{filter:drop-shadow(0 0 0 transparent)}}
+.badge-svg{transition:opacity .4s}
+.idxgrid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+.idxgrid table{font-size:12px} .idxgrid td{word-break:break-all}
+.lk{font-size:12px;padding:5px 0;border-bottom:1px solid var(--soft);display:flex;gap:8px;align-items:baseline}
+.lk .op{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--index);flex:none}
+.idxrow{transition:fill .3s}
+.idxrow.hit{fill:var(--index) !important;fill-opacity:.25 !important}
+@media (max-width:900px){.idxgrid{grid-template-columns:1fr}}
+.recs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.rec{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:10px 12px;transition:box-shadow .3s,border-color .3s}
+.rec.hit{border-color:var(--index);box-shadow:0 0 0 3px var(--index-soft)}
+.rec .av{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;flex:none}
+.rec .nm{font-weight:700}
+.rec .ln{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+.rec .ln span{background:var(--soft);border-radius:6px;padding:1px 6px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-height:26px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;border-radius:999px;padding:3px 10px;background:var(--index-soft);color:var(--index);animation:slidein .4s ease-out}
+.pill.miss{background:var(--err-soft);color:var(--err)}
+.tasks{display:grid;gap:8px}
+.task{border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .2s}
+.task.sel{border-color:var(--ink)}
+.task .top{display:flex;align-items:center;gap:10px}
+.task .av{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;flex:none;background:var(--prov-soft);color:var(--prov)}
+.task.rogue .av{background:var(--rogue-soft);color:var(--rogue)}
+.task .nm{font-weight:600;line-height:1.2} .task .sv{font-size:11.5px;color:var(--muted)}
+.task .grow{flex:1;min-width:0}
+.track{display:flex;align-items:flex-start;margin-top:10px}
+.stp{flex:1;display:flex;flex-direction:column;align-items:center;position:relative;font-size:10.5px;color:var(--faint);text-align:center;line-height:1.15}
+.stp::before{content:"";position:absolute;top:13px;left:-50%;right:50%;height:3px;background:var(--line);z-index:0}
+.stp:first-child::before{display:none}
+.stp .ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:14px;background:var(--soft);border:2px solid var(--line);position:relative;z-index:1;margin-bottom:3px;filter:grayscale(1);opacity:.6}
+.stp.done{color:var(--ink)} .stp.done::before{background:var(--c,var(--prov))}
+.stp.done .ic{filter:none;opacity:1;border-color:var(--c,var(--prov));background:var(--card)}
+.stp.now .ic{animation:pulse 1.2s infinite;border-color:var(--human);filter:none;opacity:1}
+.stp.fail{color:var(--err);font-weight:600} .stp.fail::before{background:var(--err)}
+.stp.fail .ic{border-color:var(--err);background:var(--err-soft);filter:none;opacity:1}
+.res{margin-top:8px;font-size:12px;color:var(--muted)}
+.res b{color:var(--ink)}
+.shield{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:none}
+.shield.ok{background:var(--ok-soft)} .shield.bad{background:var(--err-soft)} .shield.wait{background:var(--soft)}
+.edge.ov{stroke:var(--human);stroke-dasharray:2 6;opacity:.55}
+.edge.ov.hot{opacity:1;stroke-width:2.5}
+.cnt{font-size:11px;font-weight:700;paint-order:stroke;stroke:var(--card);stroke-width:4px}
+.ticker{display:flex;gap:8px;overflow:hidden;padding:0 12px 12px;min-height:58px}
+.tx{flex:none;width:210px;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:6px 9px;font-size:12px;background:var(--card);animation:slidein .45s ease-out}
+.tx .r1{display:flex;justify-content:space-between;gap:6px;font-weight:700}
+.tx .r2{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .dir{font-size:10.5px;color:var(--faint);font-weight:600}
+@keyframes slidein{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{max-width:72%;border-radius:14px;padding:8px 12px;font-size:13px;border:1px solid var(--line)}
+.msg .h{font-size:11px;font-weight:700;margin-bottom:2px;display:flex;gap:8px;justify-content:space-between}
+.msg.provider{align-self:flex-start;background:var(--prov-soft);border-color:transparent;border-bottom-left-radius:4px}
+.msg.provider .h{color:var(--prov)}
+.msg.payer{align-self:flex-end;background:var(--payer-soft);border-color:transparent;border-bottom-right-radius:4px}
+.msg.payer .h{color:var(--payer)}
+.msg.rogue{align-self:flex-start;background:var(--rogue-soft);border-color:transparent;border-bottom-left-radius:4px}
+.msg.rogue .h{color:var(--rogue)}
+.sys{align-self:center;font-size:12px;color:var(--muted);text-align:center;max-width:86%}
+.sys.idx{color:var(--index)}
+.ovs{align-self:center;max-width:86%;border:1.5px dashed var(--human);background:var(--human-soft);border-radius:10px;padding:6px 12px;font-size:12.5px}
+.ovs b{color:var(--human)}
+@media (max-width:1100px){.cols{grid-template-columns:1fr 1fr}.cols .rogue{grid-column:1 / -1}}
+@media (max-width:720px){.cols{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.ev{grid-template-columns:44px 80px 1fr}}
+/* ---------- modern polish ---------- */
+body{background:radial-gradient(1200px 600px at 10% -10%,var(--prov-soft),transparent 60%),radial-gradient(900px 500px at 100% 0%,var(--index-soft),transparent 55%),var(--bg);background-attachment:fixed;font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+header{background:linear-gradient(120deg,#0e1a3a 0%,#2a1f63 55%,#0b4f45 100%);color:#fff;border-radius:20px;padding:20px 22px;box-shadow:0 10px 30px -12px rgba(30,30,90,.45)}
+h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
+h1 small{color:rgba(255,255,255,.72);font-size:13.5px;margin-top:2px}
+header .chip{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18);color:rgba(255,255,255,.75)}
+header .chip b{color:#fff}
+header .seg{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18);border-radius:999px}
+header .seg button{color:rgba(255,255,255,.75);padding:6px 12px}
+header .seg button.on{background:#fff;color:#1b1f3a;border-radius:999px}
+header .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff;border-radius:999px;text-decoration:none}
+.card{border-radius:18px;border-color:color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px -12px rgba(16,24,40,.18);backdrop-filter:blur(6px)}
+.stat{position:relative;overflow:hidden;padding:14px 16px}
+.stat::after{content:"";position:absolute;right:-20px;top:-20px;width:90px;height:90px;border-radius:50%;background:currentColor;opacity:.06}
+.stat .v{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.stats .stat:nth-child(1){color:var(--prov)} .stats .stat:nth-child(2){color:var(--human)} .stats .stat:nth-child(3){color:var(--payer)} .stats .stat:nth-child(4){color:var(--rogue)}
+.stats .stat:nth-child(3) .v{color:var(--payer)} .stats .stat:nth-child(4) .v{color:var(--rogue)}
+.stat .l{color:var(--muted)}
+.panel{padding:18px}
+.panel.prov,.panel.payer,.panel.rogue,.panel.idx{border-top:0;position:relative;overflow:hidden}
+.panel.prov::before,.panel.payer::before,.panel.rogue::before,.panel.idx::before{content:"";position:absolute;inset:0 0 auto 0;height:4px}
+.panel.prov::before{background:linear-gradient(90deg,var(--prov),#7aa7ff)}
+.panel.payer::before{background:linear-gradient(90deg,var(--payer),#5fe0b8)}
+.panel.rogue::before{background:linear-gradient(90deg,var(--rogue),#ff9aa1)}
+.panel.idx::before{background:linear-gradient(90deg,var(--index),#c4b5ff)}
+.panel h2{font-size:16px;font-weight:750;letter-spacing:-.01em}
+.btn{border-radius:10px;transition:transform .12s,box-shadow .2s,background .2s}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(135deg,#2463d1,#5b4fe0);border:0;box-shadow:0 6px 16px -6px rgba(60,80,220,.6);padding:10px 16px;border-radius:12px}
+.btn.danger{background:linear-gradient(135deg,#c62f3a,#e2557a);border:0;box-shadow:0 6px 16px -6px rgba(200,50,70,.55);border-radius:12px}
+.btn.ghost-danger{border-radius:12px}
+.pt{border-radius:14px;padding:10px 12px;transition:all .15s}
+.pt:hover{border-color:var(--faint)}
+.pt.on{box-shadow:0 0 0 3px var(--prov-soft)}
+.chart{border-radius:14px;background:var(--soft);border:0}
+.doc{border-top:1px solid color-mix(in srgb,var(--line) 60%,transparent)}
+.task{border-radius:16px;background:linear-gradient(180deg,var(--card),color-mix(in srgb,var(--soft) 40%,var(--card)))}
+.task:hover{box-shadow:0 6px 18px -10px rgba(16,24,40,.35)}
+.task.sel{border-color:var(--prov);box-shadow:0 0 0 3px var(--prov-soft)}
+.task.rogue.sel{border-color:var(--rogue);box-shadow:0 0 0 3px var(--rogue-soft)}
+.inbox .it{border-radius:12px;padding:8px;border-bottom:0;margin-bottom:4px}
+.inbox .it:hover{background:var(--soft)}
+.cp{border-radius:16px;box-shadow:0 8px 24px -12px rgba(183,120,6,.6);animation:slidein .4s ease-out}
+.badge{border-radius:999px;padding:3px 9px}
+.graph{padding:10px 10px 0}
+.tx{border-radius:12px;box-shadow:0 4px 12px -8px rgba(16,24,40,.35)}
+.msg{box-shadow:0 2px 8px -6px rgba(16,24,40,.4)}
+h3{font-size:11px}
+@media (prefers-color-scheme: dark){header{background:linear-gradient(120deg,#0b1430 0%,#21184d 55%,#083a33 100%)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Prior Auth Watchtower<small>Who watches the swarm? Agents do the routine work; people make the judgment calls.</small></h1>
+    <div class="controls">
+      <span class="chip">signatures <b id="cryptoChip">…</b></span>
+      <span class="chip">index <b id="indexChip">…</b></span>
+      <span class="seg" title="Who answers human checkpoints">
+        <button id="modeLive" class="on">You decide</button><button id="modeAuto">Scripted humans</button>
+      </span>
+      <span class="seg" title="Animation speed">
+        <button data-speed="0.5">0.5×</button><button data-speed="1" class="on">1×</button><button data-speed="2.5">2.5×</button>
+      </span>
+      <a class="btn" href="/api/trace" target="_blank" rel="noopener">trace.json</a>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="card stat"><div class="v" id="stMsgs" style="color:var(--prov)">0</div><div class="l">agent-to-agent messages</div></div>
+    <div class="card stat"><div class="v" id="stHuman" style="color:var(--human)">0</div><div class="l">human touches (judgment only)</div></div>
+    <div class="card stat"><div class="v" id="stAuto">0</div><div class="l">requests closed with zero human touches</div></div>
+    <div class="card stat"><div class="v" id="stSpoof">0</div><div class="l">spoofed agents blocked</div></div>
+  </div>
+
+  <div class="card graph">
+    <svg id="g" viewBox="0 0 1000 450" role="img" aria-label="Agent layer: provider agent, insurer agent, NANDA Index and a spoofed agent exchanging signed messages. Human oversight layer below: people who only see judgment calls.">
+      <!-- layers -->
+      <rect x="6" y="6" width="988" height="300" rx="16" fill="var(--soft)" opacity=".6"/>
+      <text class="orgl" x="24" y="30">Agent layer · agents talk to agents</text>
+      <text class="orgl" x="24" y="334">Human oversight layer · judgment calls only</text>
+      <line x1="6" x2="994" y1="318" y2="318" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+      <!-- edges (paths are used for packet animation) -->
+      <path id="e_pp" class="edge" d="M256,170 L744,170"/>
+      <path id="e_pi" class="edge" d="M170,136 Q186,84 320,84"/>
+      <path id="e_yi" class="edge" d="M830,136 Q814,84 680,84"/>
+      <path id="e_rp" class="edge" d="M596,262 Q770,250 830,204" stroke-dasharray="5 5"/>
+      <path id="e_ri" class="edge" d="M500,228 L500,134" stroke-dasharray="3 6" opacity="0"/>
+      <path id="e_pe" class="edge" d="M110,204 L82,234"/>
+      <path id="e_pu" class="edge ov" d="M170,204 L170,350"/>
+      <path id="e_yc" class="edge ov" d="M800,204 L770,350"/>
+      <path id="e_ys" class="edge ov" d="M866,204 L904,350"/>
+      <text class="lbl3" x="500" y="190" text-anchor="middle">signed A2A envelopes · no human in this path</text>
+
+      <!-- NANDA Index -->
+      <g id="n_index" style="color:var(--index)">
+        <rect class="n-box" x="320" y="16" width="360" height="118" rx="14" fill="var(--index-soft)" stroke="var(--index)" stroke-width="2.5"/>
+        <text class="lbl" x="500" y="38" text-anchor="middle" style="fill:var(--index)">🌐 NANDA Index · the DNS for agents</text>
+        <text class="lbl2" x="500" y="53" text-anchor="middle">agent ID → endpoint · capabilities · public key</text>
+        <g id="idxRows"></g>
+      </g>
+      <!-- Provider agent -->
+      <g id="n_provider" style="color:var(--prov)">
+        <rect class="n-box" x="84" y="136" width="172" height="68" rx="12" fill="var(--prov-soft)" stroke="var(--prov)"/>
+        <text class="lbl" x="170" y="164" text-anchor="middle">🤖 Provider agent</text>
+        <text class="lbl2" x="170" y="182" text-anchor="middle">Riverside Health System</text>
+      </g>
+      <!-- Payer agent -->
+      <g id="n_payer" style="color:var(--payer)">
+        <rect class="n-box" x="744" y="136" width="172" height="68" rx="12" fill="var(--payer-soft)" stroke="var(--payer)"/>
+        <text class="lbl" x="830" y="164" text-anchor="middle">🤖 Insurer agent</text>
+        <text class="lbl2" x="830" y="182" text-anchor="middle">Example Health Plan</text>
+      </g>
+      <!-- Rogue agent -->
+      <g id="n_rogue" style="color:var(--rogue)">
+        <rect class="n-box" x="404" y="228" width="192" height="64" rx="12" fill="var(--rogue-soft)" stroke="var(--rogue)" stroke-dasharray="6 4"/>
+        <text class="lbl" x="500" y="256" text-anchor="middle">🤖 Spoofed agent</text>
+        <text class="lbl2" x="500" y="274" text-anchor="middle">claims to be Riverside</text>
+      </g>
+      <!-- EMR (a tool the provider agent uses) -->
+      <g id="n_emr">
+        <path d="M40,234 h64 v40 h-64z" fill="var(--card)" stroke="var(--faint)" stroke-width="1.5"/>
+        <path d="M40,246 h64 M40,258 h64" stroke="var(--line)" stroke-width="1.5"/>
+        <text class="lbl2" x="72" y="268" text-anchor="middle" style="font-weight:700;fill:var(--ink)">EMR</text>
+      </g>
+      <!-- Humans -->
+      <g id="h_um" class="human-n" transform="translate(170,350)">
+        <circle class="ring" cx="0" cy="22" r="26"/>
+        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Provider overseer</text>
+        <text class="lbl2" x="0" y="76" text-anchor="middle">delegates · approves PHI release</text>
+      </g>
+      <g id="h_md" class="human-n" transform="translate(770,350)">
+        <circle class="ring" cx="0" cy="22" r="26"/>
+        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Clinician (MD)</text>
+        <text class="lbl2" x="0" y="76" text-anchor="middle">decides any denial</text>
+      </g>
+      <g id="h_sec" class="human-n" transform="translate(904,350)">
+        <circle class="ring" cx="0" cy="22" r="26"/>
+        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Security analyst</text>
+        <text class="lbl2" x="0" y="76" text-anchor="middle">identity alerts</text>
+      </g>
+      <g id="fx"></g>
+    </svg>
+    <div class="legend">
+      <span><i style="background:var(--prov)"></i>request / more info</span>
+      <span><i style="background:var(--ok)"></i>approved</span>
+      <span><i style="background:var(--warn)"></i>pended (send more info)</span>
+      <span><i style="background:var(--err)"></i>denied / rejected</span>
+      <span><i style="background:var(--index)"></i>index lookup</span>
+      <span><i style="background:var(--human)"></i>human oversight</span>
+    </div>
+    <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
+  </div>
+
+  <section class="card panel idx" style="margin-bottom:12px;border-top:3px solid var(--index)">
+    <h2><span class="dot" style="background:var(--index)"></span>🌐 NANDA Index · DNS for agents</h2>
+    <div class="sub">Like DNS maps a name to an address, the index maps an agent ID to its endpoint, skills and public key. Anyone can read it, but only the real agent can sign with the listed key.</div>
+    <div class="recs" id="idxRecs"></div>
+    <div class="pills" id="idxLog"></div>
+  </section>
+
+  <div class="cols">
+    <!-- PROVIDER -->
+    <section class="card panel prov">
+      <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
+      <div class="sub">No forms, no phone calls. Hand the task to your agent: it pulls the chart, finds the insurer's agent, and negotiates with it. You are only pulled in for decisions that need a person.</div>
+      <div class="patients" id="patients"></div>
+      <div class="chart" id="chart"></div>
+      <div class="submit-row">
+        <button class="btn primary" id="submitBtn">🤖 Delegate to provider agent</button>
+        <span class="note" id="submitNote"></span>
+      </div>
+      <div id="provCps"></div>
+      <h3>Delegated tasks (status from the agents)</h3>
+      <div id="myReqs" class="tasks"></div>
+      <div class="empty" id="myReqsEmpty">Nothing delegated yet.</div>
+    </section>
+
+    <!-- PAYER -->
+    <section class="card panel payer">
+      <h2><span class="dot" style="background:var(--payer)"></span>Insurer oversight · Example Health Plan</h2>
+      <div class="sub">The insurer's agent verifies the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
+      <div id="payerCps"></div>
+      <h3>What the insurer agent received</h3>
+      <div class="inbox" id="inbox"></div>
+      <div class="empty" id="inboxEmpty">Nothing received yet.</div>
+      <h3>Security alerts</h3>
+      <div id="alerts"><div class="empty">No alerts.</div></div>
+      <div class="policy" id="policy" style="margin-top:14px"></div>
+    </section>
+
+    <!-- ROGUE -->
+    <section class="card panel rogue">
+      <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
+      <div class="sub">An attacker finds the insurer's endpoint in the public index and sends a forged request with a fabricated clinical note.</div>
+      <div class="attack">
+        <button class="btn danger" data-attack="impersonate">Impersonate Riverside<small>uses Riverside's agent ID, signs with its own key</small></button>
+        <button class="btn ghost-danger" data-attack="unregistered">Unregistered agent<small>an agent ID that is not in the index</small></button>
+      </div>
+      <h3>Attempts</h3>
+      <div class="inbox" id="attempts"></div>
+      <div class="empty" id="attemptsEmpty">No attacks yet.</div>
+    </section>
+  </div>
+
+  <section class="card timeline">
+    <div class="hd">
+      <h2 style="margin:0;font-size:15px" id="tlTitle">Agent-to-agent conversation</h2>
+      <span class="chip" id="tlMeta">select a task to replay what the agents said to each other</span>
+    </div>
+    <div id="tl"><div class="empty">Nothing yet.</div></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+const SVGNS = "http://www.w3.org/2000/svg";
+const api = (path, body) => fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r => r.json());
+
+let boot = null, fetched = 0, speed = 1, selPatient = "pt-1001", selCase = null, firstLoad = true;
+const queue = [];
+const cases = {};          // client view, built from *played* events
+const checkpoints = {};    // id -> checkpoint (visible after its event plays)
+const alerts = [];
+let t0 = null;
+
+// ------------------------------------------------------------- bootstrap
+async function init(){
+  boot = await api("/api/bootstrap");
+  $("#cryptoChip").textContent = boot.crypto;
+  $("#indexChip").textContent = boot.index_label;
+  drawIndex();
+  const pol = Object.entries(boot.policy).map(([code,p]) => `<b>${esc(p.name)}</b> (CPT ${esc(code)}): ${esc(p.criteria_text)}. Proposed denials go to a clinician.`).join("<br>");
+  $("#policy").innerHTML = pol;
+  renderPatients();
+  poll();
+  player();
+}
+function drawIndex(){
+  const g = $("#idxRows"); g.innerHTML = "";
+  boot.agents.forEach((a, i) => {
+    const y = 62 + i * 30;
+    const col = a.role === "payer" ? "var(--payer)" : "var(--prov)";
+    g.insertAdjacentHTML("beforeend", `<g><rect class="idxrow" data-aid="${esc(a.agent_id)}" x="332" y="${y}" width="336" height="26" rx="6" fill="var(--card)" fill-opacity=".85"/>
+      <circle cx="345" cy="${y + 13}" r="4" fill="${col}"/>
+      <text x="355" y="${y + 11}" style="font-size:10.5px;font-weight:700;fill:var(--ink)">${esc(a.organization)} · ${esc(a.role)} agent</text>
+      <text class="lbl3" x="355" y="${y + 22}">${esc(shortId(a.agent_id, 22))}  🔑 ${esc(a.public_key.slice(0, 10))}…</text></g>`);
+  });
+  $("#idxRecs").innerHTML = boot.agents.map(a => {
+    const pay = a.role === "payer";
+    return `<div class="rec" data-aid="${esc(a.agent_id)}"><div class="av" style="background:var(--${pay ? "payer" : "prov"}-soft)">${pay ? "🏦" : "🏥"}</div>
+      <div style="min-width:0"><div class="nm">${esc(a.organization)} · ${pay ? "insurer" : "provider"} agent</div>
+      <div class="mono" style="font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(a.agent_id)}">${esc(a.agent_id)}</div>
+      <div class="ln"><span>⚡ ${esc(a.capabilities[0])}</span><span>📍 ${esc(a.endpoint)}</span><span title="${esc(a.public_key)}">🔑 ${esc(a.public_key.slice(0, 8))}…</span></div></div></div>`;
+  }).join("") + `<div class="rec" style="border-style:dashed;opacity:.8"><div class="av" style="background:var(--rogue-soft)">🕵️</div>
+      <div><div class="nm" style="color:var(--rogue)">Spoofed agent · not registered</div><div class="ln"><span>no record · no trusted key</span></div></div></div>`;
+}
+function hitRows(ids){
+  document.querySelectorAll(".idxrow, .rec[data-aid]").forEach(r => { if (ids.includes(r.dataset.aid)){ r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 1600 / speed); } });
+}
+const lookups = [];
+const shortId = (id, n = 20) => id.length > 2 * n + 4 ? id.slice(0, n) + "…" + id.slice(-n) : id;
+
+function renderPatients(){
+  $("#patients").innerHTML = boot.patients.map(p => `
+    <button class="pt ${p.id===selPatient?"on":""}" data-pid="${p.id}">
+      <span class="r"></span>
+      <span><span class="n">${esc(p.name)}</span><br>
+      <span class="m">${esc(p.member_id)} · ${esc(p.service_request.display)} · <i>${esc(p.hint)}</i></span></span>
+    </button>`).join("");
+  const p = boot.patients.find(x => x.id === selPatient);
+  $("#chart").innerHTML = `
+    <div class="row"><span class="k">Service</span><span>${esc(p.service_request.display)} <span class="mono">CPT ${esc(p.service_request.code)}</span></span></div>
+    <div class="row"><span class="k">Diagnosis</span><span>${p.conditions.map(c => `${esc(c.display)} <span class="mono">${esc(c.code)}</span>`).join(", ")}</span></div>
+    <div class="row"><span class="k">DOB</span><span>${esc(p.dob)}</span></div>
+    <div style="margin-top:6px">${p.documents.map(d => `
+      <div class="doc"><span class="t">${esc(d.type)}<br>${esc(d.date)}</span><span style="flex:1">${esc(d.text)}</span>
+      ${d.withheld ? '<span class="tag" title="Not sent up front (minimum necessary). Released only if the insurer asks and staff approve.">held back</span>' : ""}</div>`).join("")}
+    </div>`;
+  document.querySelectorAll(".pt").forEach(b => b.onclick = () => { selPatient = b.dataset.pid; renderPatients(); });
+}
+
+// ------------------------------------------------------------- polling
+async function poll(){
+  try{
+    const st = await api(`/api/state?since=${fetched}`);
+    setMode(st.auto, false);
+    for (const ev of st.events){ fetched = Math.max(fetched, ev.seq); queue.push(ev); }
+    if (firstLoad){ firstLoad = false; while (queue.length) apply(queue.shift()); render(); }
+  }catch(e){ /* server restarting: keep trying */ }
+  setTimeout(poll, 400);
+}
+
+// ------------------------------------------------------------- player
+const wait = ms => new Promise(r => setTimeout(r, ms / speed));
+async function player(){
+  for(;;){
+    if (!queue.length){ await new Promise(r => setTimeout(r, 80)); continue; }
+    const ev = queue.shift();
+    try { await animate(ev); } catch(e){ console.error(e); }
+    apply(ev); render();
+  }
+}
+
+const EDGES = {
+  "provider>payer":["e_pp",false], "payer>provider":["e_pp",true],
+  "rogue>payer":["e_rp",false], "payer>rogue":["e_rp",true],
+  "provider>index":["e_pi",false], "index>provider":["e_pi",true],
+  "payer>index":["e_yi",false], "index>payer":["e_yi",true],
+  "rogue>index":["e_ri",false], "index>rogue":["e_ri",true],
+  "provider>emr":["e_pe",false], "emr>provider":["e_pe",true],
+  "provider>um":["e_pu",false], "um>provider":["e_pu",true],
+  "payer>md":["e_yc",false], "md>payer":["e_yc",true], "payer>sec":["e_ys",false],
+};
+const counts = {provider:{s:0,r:0}, payer:{s:0,r:0}, rogue:{s:0,r:0}};
+function drawCounts(){
+  const pos = {provider:[170,222], payer:[830,222], rogue:[500,306]};
+  for (const [n,[x,y]] of Object.entries(pos)){
+    let t = document.getElementById("cnt_" + n);
+    if (!t){ t = document.createElementNS(SVGNS,"text"); t.id = "cnt_" + n; t.setAttribute("class","cnt");
+      t.setAttribute("x",x); t.setAttribute("y",y); t.setAttribute("text-anchor","middle"); $("#g").insertBefore(t, $("#fx")); }
+    t.innerHTML = `<tspan fill="var(--prov)">▲ ${counts[n].s} sent</tspan><tspan fill="var(--faint)">  ·  </tspan><tspan fill="var(--payer)">▼ ${counts[n].r} received</tspan>`;
+  }
+}
+const NAMES = {provider:"Provider agent", payer:"Insurer agent", rogue:"Spoofed agent"};
+function pushTx(ev){
+  const b = ev.env.body || {}, color = ev.env.type === "pa.rejected" ? "var(--err)" : statusColor(b.status);
+  const tk = $("#ticker"); const e = tk.querySelector(".empty"); if (e) e.remove();
+  const d = document.createElement("div"); d.className = "tx"; d.style.setProperty("--c", color);
+  d.innerHTML = `<div class="r1"><span class="mono">${esc(ev.env.type)}</span>${b.status ? badge(b.status) : ""}</div>
+    <div class="dir">${esc(NAMES[ev.from_node])} → ${esc(NAMES[ev.to_node])} · #${ev.case} · ${ev.from_node === "rogue" ? '<span class="bad-t">sig ✘ forged</span>' : '<span class="ok-t">sig ✔</span>'}</div>
+    <div class="r2" title="${esc(b.summary || "")}">${esc(b.summary || "")}</div>`;
+  d.onclick = () => { selCase = ev.case; render(); };
+  tk.prepend(d); while (tk.children.length > 12) tk.lastChild.remove();
+}
+const statusColor = s => ({APPROVED:"var(--ok)", PENDED:"var(--warn)", DENIED:"var(--err)", REJECTED:"var(--err)"}[s] || "var(--prov)");
+
+function movePacket(key, color, label, ms){
+  const [id, rev] = EDGES[key];
+  const path = document.getElementById(id);
+  const len = path.getTotalLength();
+  const fx = $("#fx");
+  const g = document.createElementNS(SVGNS, "g");
+  g.innerHTML = `<circle r="8" fill="${color}" stroke="var(--card)" stroke-width="2.5"/>` +
+    (label ? `<text class="pk-l" y="-14" text-anchor="middle" fill="${color}">${esc(label)}</text>` : "");
+  fx.appendChild(g);
+  path.classList.add("hot");
+  if (id === "e_ri") path.setAttribute("opacity", "1");
+  return new Promise(res => {
+    const start = performance.now(), dur = ms / speed;
+    const step = now => {
+      let t = Math.min(1, (now - start) / dur);
+      const e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+      const p = path.getPointAtLength((rev ? 1 - e : e) * len);
+      g.setAttribute("transform", `translate(${p.x},${p.y})`);
+      if (t < 1) requestAnimationFrame(step);
+      else { g.remove(); path.classList.remove("hot"); if (id === "e_ri") path.setAttribute("opacity","0"); res(); }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+const NODE_POS = {provider:[170,118], payer:[830,118], rogue:[500,312], index:[500,150]};
+function floatBadge(node, text, color, ms = 2600){
+  const [x, y] = NODE_POS[node];
+  const g = document.createElementNS(SVGNS, "g");
+  g.classList.add("badge-svg");
+  const w = Math.max(80, text.length * 6.6 + 18);
+  g.innerHTML = `<rect x="${x - w/2}" y="${y - 13}" width="${w}" height="22" rx="11" fill="var(--card)" stroke="${color}" stroke-width="1.5"/>
+    <text x="${x}" y="${y + 2}" text-anchor="middle" style="font-size:11.5px;font-weight:700" fill="${color}">${esc(text)}</text>`;
+  $("#fx").appendChild(g);
+  setTimeout(() => { g.style.opacity = "0"; setTimeout(() => g.remove(), 450); }, ms / speed);
+}
+function flash(id){ const n = document.getElementById(id); n.classList.remove("flash"); void n.getBBox(); n.classList.add("flash"); }
+
+async function animate(ev){
+  switch (ev.kind){
+    case "send": {
+      const b = ev.env.body || {};
+      const label = ev.env.type + (b.status ? " · " + b.status : "");
+      const color = ev.env.type === "pa.rejected" ? "var(--err)" : statusColor(b.status);
+      counts[ev.from_node].s++; drawCounts(); pushTx(ev);
+      await movePacket(`${ev.from_node}>${ev.to_node}`, color, label, 1300);
+      counts[ev.to_node].r++; drawCounts();
+      flash("n_" + ev.to_node);
+      return wait(150);
+    }
+    case "index": {
+      const who = ev.by;
+      const q = ev.op === "find" ? `find ${ev.query}` : "resolve sender key";
+      await movePacket(`${who}>index`, "var(--index)", q, 800);
+      flash("n_index");
+      const found = ev.op === "find" ? ev.result.length > 0 : ev.found;
+      if (found) hitRows(ev.op === "find" ? ev.result : [ev.query]);
+      else floatBadge("index", "✘ no such agent in the index", "var(--err)", 2600);
+      await wait(350);
+      await movePacket(`index>${who}`, found ? "var(--index)" : "var(--err)", found ? "AgentFacts" : "not found", 700);
+      return;
+    }
+    case "ok":
+      if (ev.node === "payer" && /signature verified/.test(ev.text)){ floatBadge("payer", "✔ identity verified", "var(--ok)"); return wait(600); }
+      if (ev.node === "provider" && /discovered/.test(ev.text)) return wait(150);
+      return wait(200);
+    case "bad":
+      if (ev.node === "payer"){ floatBadge("payer", "✘ " + (/not found/.test(ev.text) ? "unknown agent" : "signature mismatch"), "var(--err)", 3400); return wait(800); }
+      return wait(200);
+    case "step":
+      if (/searched EMR/.test(ev.text)){ await movePacket("provider>emr", "var(--prov)", "search chart", 600); await movePacket("emr>provider", "var(--prov)", "PT notes", 600); return; }
+      if (/pulled \d+ document/.test(ev.text)){ await movePacket("provider>emr", "var(--prov)", "", 450); await movePacket("emr>provider", "var(--prov)", "chart", 450); return; }
+      if (/checking criteria/.test(ev.text)){ floatBadge("payer", "checking policy…", "var(--payer)", 1400); return wait(500); }
+      return wait(120);
+    case "checkpoint": {
+      await movePacket(ev.side === "provider" ? "provider>um" : "payer>md", "var(--human)", "needs a person", 900);
+      return wait(200);
+    }
+    case "decided": {
+      const prov = /^provider/i.test(ev.who);
+      await movePacket(prov ? "um>provider" : "md>payer", "var(--human)", ev.word.toLowerCase(), 900);
+      return wait(200);
+    }
+    case "alert":
+      await movePacket("payer>sec", "var(--err)", "alert", 800);
+      document.getElementById("h_sec").classList.add("alerted");
+      document.getElementById("e_ys").classList.add("hot");
+      setTimeout(() => { document.getElementById("h_sec").classList.remove("alerted"); document.getElementById("e_ys").classList.remove("hot"); }, 3500 / speed);
+      return wait(500);
+    case "outcome": {
+      const c = cases[ev.case];
+      if (c && c.kind === "rogue") floatBadge("rogue", ev.status, statusColor(ev.status), 3000);
+      else floatBadge("provider", ev.status, statusColor(ev.status), 3000);
+      return wait(500);
+    }
+    case "case": return wait(150);
+    default: return wait(60);
+  }
+}
+
+// ------------------------------------------------------------- state from events
+function apply(ev){
+  if (t0 === null) t0 = ev.ts;
+  if (ev.kind === "case"){
+    cases[ev.case] = {...ev.meta, status: "SUBMITTED", events: [], touches: 0, msgs: 0, identity: null, done: false};
+    if (!firstLoad || selCase === null) selCase = ev.case;
+  }
+  if (ev.kind === "index") lookups.unshift(ev);
+  const c = cases[ev.case];
+  if (!c) return;
+  c.events.push(ev);
+  switch (ev.kind){
+    case "send": c.msgs++; break;
+    case "ok": if (ev.node === "payer" && /signature verified/.test(ev.text)) c.identity = "ok"; break;
+    case "bad": if (ev.node === "payer") { c.identity = "bad"; c.identityWhy = ev.text.replace(/^payer: identity check failed — /, ""); } break;
+    case "human": c.touches++; break;
+    case "checkpoint": checkpoints[ev.id] = ev; c.status = "AWAITING HUMAN"; c.waitingOn = ev.who; break;
+    case "decided":
+      for (const [id, cp] of Object.entries(checkpoints)) if (cp.case === ev.case) delete checkpoints[id];
+      c.status = "IN REVIEW"; c.waitingOn = null; c.lastDecision = ev; break;
+    case "alert": c.touches++; alerts.unshift({...ev, caseId: ev.case}); break;
+    case "outcome": c.status = ev.status; c.summary = ev.detail; break;
+    case "done": c.done = true; c.status = ev.status; c.result = ev.result; break;
+  }
+  updateHumans();
+}
+
+function updateHumans(){
+  const open = Object.values(checkpoints);
+  $("#h_um").classList.toggle("waiting", open.some(cp => cp.side === "provider"));
+  $("#h_md").classList.toggle("waiting", open.some(cp => cp.side === "payer"));
+  $("#e_pu").classList.toggle("hot", open.some(cp => cp.side === "provider"));
+  $("#e_yc").classList.toggle("hot", open.some(cp => cp.side === "payer"));
+}
+
+// ------------------------------------------------------------- render panels
+const badge = s => `<span class="badge s-${esc(String(s).replace(/ /g,"_"))}">${esc(s)}</span>`;
+
+function render(){
+  const all = Object.values(cases).sort((a, b) => b.id - a.id);
+  const prov = all.filter(c => c.kind === "provider"), rogue = all.filter(c => c.kind === "rogue");
+
+  // stats
+  $("#stMsgs").textContent = all.reduce((n, c) => n + c.msgs, 0);
+  $("#stAuto").textContent = prov.filter(c => c.done && c.touches === 0).length;
+  $("#stHuman").textContent = all.reduce((n, c) => n + c.touches, 0);
+  $("#stSpoof").textContent = rogue.filter(c => c.status === "REJECTED").length;
+
+  // provider requests
+  $("#myReqsEmpty").style.display = prov.length ? "none" : "";
+  $("#myReqs").innerHTML = prov.map(taskCard).join("");
+
+  // payer inbox (everything that reached the insurer)
+  $("#inboxEmpty").style.display = all.length ? "none" : "";
+  $("#inbox").innerHTML = all.map(c => {
+    const from = c.kind === "rogue" ? (c.attack === "impersonate" ? "claims to be Riverside" : "unknown agent") : "Riverside Health System";
+    const sh = c.identity === "ok" ? ["ok", "🛡️", '<span class="id-ok">identity verified</span>'] :
+               c.identity === "bad" ? ["bad", "⛔", '<span class="id-bad">identity failed</span>'] : ["wait", "⏳", '<span class="id-wait">checking…</span>'];
+    return `<div class="it" data-case="${c.id}"><div class="shield ${sh[0]}">${sh[1]}</div><div class="grow"><div class="t1">#${c.id} · ${esc(c.patient)}</div>
+      <div class="t2">${esc(from)} · ${sh[2]}</div></div>${badge(c.status)}</div>`;
+  }).join("");
+
+  // index lookups
+  const who = {provider:"🤖 Provider", payer:"🤖 Insurer", rogue:"🕵️ Spoofed"};
+  $("#idxLog").innerHTML = lookups.slice(0, 8).map(l => {
+    const found = l.op === "find" ? l.result.length > 0 : l.found;
+    const what = l.op === "find" ? `find ${l.query}` : "resolve caller's key";
+    return `<span class="pill ${found ? "" : "miss"}">${esc(who[l.by])} → 🌐 ${esc(what)} ${found ? "✔" : "✘ no record"}</span>`;
+  }).join("") || '<span class="empty">Lookups appear here as agents use the index.</span>';
+
+  // alerts
+  $("#alerts").innerHTML = alerts.length ? alerts.slice(0, 5).map(a => `<div class="alert"><b>#${a.caseId}</b> ${esc(a.message)}</div>`).join("") : '<div class="empty">No alerts.</div>';
+
+  // rogue attempts
+  $("#attemptsEmpty").style.display = rogue.length ? "none" : "";
+  $("#attempts").innerHTML = rogue.map(taskCard).join("");
+
+  // checkpoints
+  const cps = Object.values(checkpoints);
+  $("#provCps").innerHTML = cps.filter(cp => cp.side === "provider").map(cpCard).join("");
+  $("#payerCps").innerHTML = cps.filter(cp => cp.side === "payer").map(cpCard).join("");
+  document.querySelectorAll("[data-decide]").forEach(b => b.onclick = async () => {
+    b.closest(".cp").querySelectorAll("button").forEach(x => x.disabled = true);
+    await api("/api/decide", {id: +b.dataset.decide, approve: b.dataset.yes === "1"});
+  });
+
+  document.querySelectorAll("[data-case]").forEach(el => el.onclick = () => { selCase = +el.dataset.case; render(); });
+  renderTimeline();
+}
+function steps(c){
+  const has = (k, f = () => true) => c.events.some(e => e.kind === k && f(e));
+  const decided = c.done;
+  const col = statusColor(c.status);
+  if (c.kind === "rogue"){
+    return [
+      ["🔎", "reads index", has("index", e => e.op === "find")],
+      ["📤", "forged request", has("send", e => e.from_node === "rogue")],
+      ["🛡️", "identity check", has("bad") ? "fail" : false],
+      ["🚨", "security alerted", has("alert")],
+      ["⛔", decided ? c.status.toLowerCase() : "decision", decided ? "fail" : false],
+    ];
+  }
+  const out = [
+    ["🤖", "delegated", true],
+    ["🌐", "found insurer", has("index", e => e.op === "find")],
+    ["📤", "sent", has("send", e => e.from_node === "provider")],
+    ["🛡️", "verified", has("ok", e => /signature verified/.test(e.text))],
+    ["⚖️", "policy check", has("step", e => /checking criteria/.test(e.text)) || decided],
+  ];
+  if (has("outcome", e => e.status === "PENDED")) out.push(["📥", "more info", has("send", e => e.env.type === "pa.additional-info")]);
+  if (has("human")) out.push(["👤", c.status === "AWAITING HUMAN" ? "needs you" : "human ok", c.status === "AWAITING HUMAN" ? "now" : true]);
+  out.push([c.status === "APPROVED" ? "✅" : c.status === "DENIED" ? "❌" : "🏁", decided ? c.status.toLowerCase() : "decision", decided ? (c.status === "APPROVED" ? true : "fail") : false]);
+  return out;
+}
+function taskCard(c){
+  const col = c.kind === "rogue" ? "var(--rogue)" : statusColor(c.status) === "var(--prov)" ? "var(--prov)" : statusColor(c.status);
+  const track = steps(c).map(([ic, lb, st]) => `<div class="stp ${st === true ? "done" : st || ""}" style="--c:${col}"><span class="ic">${ic}</span>${esc(lb)}</div>`).join("");
+  const initials = c.kind === "rogue" ? "🕵️" : esc(c.patient.split(" ").slice(0, 2).map(w => w[0]).join(""));
+  let res = "";
+  if (c.result && c.result.auth_number) res = `Auth <b class="mono">${esc(c.result.auth_number)}</b> · ${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
+  else if (c.status === "AWAITING HUMAN") res = `<span style="color:var(--human)">Waiting on ${esc(c.waitingOn)}</span>`;
+  else if (c.done) res = esc(shorten(c.summary || "", 90));
+  return `<div class="task ${c.kind} ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><div class="top"><span class="av">${initials}</span>
+    <div class="grow"><div class="nm">#${c.id} · ${esc(c.kind === "rogue" ? c.label : c.patient)}</div><div class="sv">${esc(c.service)}</div></div>${badge(c.status)}</div>
+    <div class="track">${track}</div>${res ? `<div class="res">${res}</div>` : ""}</div>`;
+}
+const shorten = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
+
+function cpCard(cp){
+  const denial = cp.labels[0] === "DENIAL CONFIRMED";
+  const yes = denial ? "Confirm denial" : "Release documents";
+  const no = denial ? "Overturn · approve MRI" : "Don't release";
+  return `<div class="cp"><div class="who">👤 Needs a person · ${esc(cp.who)} · case #${cp.case}</div>
+    <div class="q">${esc(cp.question)}</div><div class="d">${esc(cp.detail)}</div>
+    <div class="acts"><button class="btn yes" data-decide="${cp.id}" data-yes="1">${yes}</button>
+    <button class="btn" data-decide="${cp.id}" data-yes="0">${no}</button></div></div>`;
+}
+
+function actorOf(ev){
+  if (ev.kind === "send") return ev.from_node;
+  if (ev.kind === "index") return "index";
+  if (["human","checkpoint","decided","alert"].includes(ev.kind)) return "human";
+  if (ev.node) return ev.node;
+  return "system";
+}
+function describe(ev, c){
+  switch (ev.kind){
+    case "case": return c.kind === "rogue" ? `Attack launched: <b>${esc(c.label)}</b>` : `Provider submitted prior auth for <b>${esc(c.patient)}</b> · ${esc(c.service)}`;
+    case "send": {
+      const e = ev.env, b = e.body || {};
+      const arrow = `${esc(ev.from_label)} → ${esc(ev.to_label)}`;
+      const shown = {...e, sig: e.sig ? e.sig.slice(0, 24) + "…" : e.sig};
+      return `<span class="mono">${esc(e.type)}</span> ${b.status ? badge(b.status) : ""} ${arrow}<br>${esc(b.summary || "")}
+        <details><summary>signed envelope ${esc(e.id)} · thread ${esc(e.thread_id)}</summary><pre>${esc(JSON.stringify(shown, null, 2))}</pre></details>`;
+    }
+    case "index":
+      return ev.op === "find" ? `Discovery: <span class="mono">find ${esc(ev.query)}</span> (${esc(ev.org || "any org")}) → ${ev.result.length ? esc(ev.result.map(x => shortId(x)).join(", ")) : "<span class='bad-t'>no match</span>"}`
+        : `Insurer looked up sender's published key: <span class="mono">${esc(shortId(ev.query))}</span> → ${ev.found ? `<span class="ok-t">found (${esc(ev.organization)})</span>` : "<span class='bad-t'>not in index</span>"}`;
+    case "ok": return `<span class="ok-t">✔</span> ${esc(ev.text.replace(/^\w+: /, ""))}`;
+    case "bad": return `<span class="bad-t">✘ ${esc(ev.text.replace(/^\w+: /, ""))}</span>`;
+    case "step": return esc(ev.text.replace(/^\w+: /, ""));
+    case "human": return `<b>Human checkpoint · ${esc(ev.who)}</b><br>${esc(ev.question)}<br><span style="color:var(--muted)">${esc(ev.detail)}</span>`;
+    case "checkpoint": return `Waiting for ${esc(ev.who)}…`;
+    case "decided": return `<b>${esc(ev.who)}:</b> ${esc(ev.word)} <span style="color:var(--muted)">(${esc(ev.how)})</span>`;
+    case "alert": return `<span class="bad-t">🚨 Alert to ${esc(ev.who)}:</span> ${esc(ev.message)}`;
+    case "outcome": return `${badge(ev.status)} ${esc(ev.detail)}`;
+    case "done": return `Case closed · ${c.msgs} signed messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
+    default: return esc(ev.kind);
+  }
+}
+function renderTimeline(){
+  const c = cases[selCase];
+  if (!c){ $("#tl").innerHTML = '<div class="empty">Nothing yet.</div>'; return; }
+  $("#tlTitle").textContent = `Agent-to-agent conversation · task #${c.id} · ${c.kind === "rogue" ? "spoofed agent" : c.patient}`;
+  $("#tlMeta").innerHTML = `${badge(c.status)} &nbsp;${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
+  const start = c.events[0] ? c.events[0].ts : 0;
+  const tm = ev => `+${(ev.ts - start).toFixed(2)}s`;
+  const out = [];
+  for (const ev of c.events){
+    switch (ev.kind){
+      case "case": out.push(`<div class="ovs">${c.kind === "rogue" ? `<b>Attacker</b> launches: ${esc(c.label)}` : `<b>Provider overseer</b> delegated: get prior auth for ${esc(c.patient)} · ${esc(c.service)}`}</div>`); break;
+      case "send": {
+        const e = ev.env, b = e.body || {};
+        const shown = {...e, sig: e.sig ? e.sig.slice(0, 24) + "…" : e.sig};
+        out.push(`<div class="msg ${ev.from_node}"><div class="h"><span>🤖 ${esc(NAMES[ev.from_node])} → ${esc(NAMES[ev.to_node])}</span><span class="mono" style="font-weight:400">${tm(ev)}</span></div>
+          <span class="mono">${esc(e.type)}</span> ${b.status ? badge(b.status) : ""}<div>${esc(b.summary || "")}</div>
+          <details><summary>signed envelope ${esc(e.id)} · thread ${esc(e.thread_id)}</summary><pre>${esc(JSON.stringify(shown, null, 2))}</pre></details></div>`);
+        break;
+      }
+      case "index": out.push(`<div class="sys idx">🔎 ${describe(ev, c)}</div>`); break;
+      case "ok": case "bad": out.push(`<div class="sys">${describe(ev, c)}</div>`); break;
+      case "step": if (/searched EMR|pulled/.test(ev.text)) out.push(`<div class="sys">🗂 ${describe(ev, c)}</div>`); break;
+      case "human": out.push(`<div class="ovs"><b>👤 Oversight · ${esc(ev.who)}</b><br>${esc(ev.question)}</div>`); break;
+      case "decided": out.push(`<div class="ovs"><b>👤 ${esc(ev.who)}:</b> ${esc(ev.word)} <span style="color:var(--muted)">(${esc(ev.how)})</span></div>`); break;
+      case "alert": out.push(`<div class="ovs" style="border-color:var(--err);background:var(--err-soft)"><b style="color:var(--err)">🚨 ${esc(ev.who)}</b> ${esc(ev.message)}</div>`); break;
+      case "done": out.push(`<div class="sys"><b>${badge(c.status)}</b> task closed · ${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}</div>`); break;
+    }
+  }
+  $("#tl").innerHTML = `<div class="chat">${out.join("")}</div>`;
+}
+
+// ------------------------------------------------------------- actions
+$("#submitBtn").onclick = async () => {
+  const b = $("#submitBtn"); b.disabled = true;
+  const r = await api("/api/submit", {patient_id: selPatient});
+  $("#submitNote").textContent = `Task #${r.id} handed to the provider agent. Watch the agents work.`;
+  setTimeout(() => { b.disabled = false; }, 600);
+};
+document.querySelectorAll("[data-attack]").forEach(b => b.onclick = () => api("/api/spoof", {mode: b.dataset.attack}));
+function setMode(auto, send = true){
+  $("#modeAuto").classList.toggle("on", auto); $("#modeLive").classList.toggle("on", !auto);
+  if (send) api("/api/mode", {auto});
+}
+$("#modeAuto").onclick = () => setMode(true);
+$("#modeLive").onclick = () => setMode(false);
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => {
+  speed = +b.dataset.speed;
+  document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b));
+});
+$("#resetBtn").onclick = async () => {
+  const r = await fetch("/api/reset", {method:"POST"}).then(x => x.json());
+  if (!r.ok){ alert(r.error); return; }
+  location.reload();
+};
+drawCounts();
+init();
+</script>
+</body>
+</html>
