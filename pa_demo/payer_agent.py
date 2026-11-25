@@ -22,6 +22,21 @@ POLICY = {
 }
 
 
+# What the insurer agent advertises on its A2A Agent Card
+A2A_DESCRIPTION = ("Reviews prior-authorization requests for Example Health Plan members. Send a "
+                   "signed PA request; the task completes with a decision, or asks for more "
+                   "documentation (TASK_STATE_INPUT_REQUIRED). Proposed denials go to a clinician.")
+A2A_SKILLS = [{
+    "id": "prior-auth.review",
+    "name": "Prior authorization review",
+    "description": "Checks a signed prior-auth request against coverage policy and returns "
+                   "APPROVED, PENDED (send more info) or DENIED (clinician-reviewed).",
+    "tags": ["prior-auth", "fhir.pas", "payer", "cms-0057-f"],
+    "inputModes": ["application/vnd.halhack.signed-envelope+json"],
+    "outputModes": ["application/vnd.halhack.signed-envelope+json", "text/plain"],
+}]
+
+
 class PayerAgent:
     AGENT_ID = "nanda:payer.example-health/prior-auth"
 
@@ -58,16 +73,29 @@ class PayerAgent:
             return self._reply(env, "pa.rejected",
                                {"status": "REJECTED", "summary": "sender not authorized to submit PA"})
 
+        thread = env["thread_id"]
+        case = self.cases.get(thread)
         if env["type"] == "pa.submit":
-            self.cases[env["thread_id"]] = {"request": env["body"], "documents": list(env["body"]["documents"])}
+            if case is not None:
+                return self._decision(env, "REJECTED", "a case with this thread already exists")
+            self.cases[thread] = {"sender": env["from"], "request": env["body"],
+                                  "documents": list(env["body"]["documents"])}
         elif env["type"] == "pa.additional-info":
-            case = self.cases.get(env["thread_id"])
-            if case is None:
+            # Only the agent that opened a case may add to it.
+            if case is None or case["sender"] != env["from"]:
                 return self._decision(env, "REJECTED", "unknown case")
             case["documents"].extend(env["body"]["documents"])
         else:
             return self._decision(env, "REJECTED", f"unsupported message type {env['type']}")
-        return self._evaluate(env)
+        try:
+            return self._evaluate(env)
+        except Exception:
+            self.forget(thread)   # the case can't continue: don't keep its documents
+            raise
+
+    def forget(self, thread_id: str) -> None:
+        """Drop a finished case and its clinical documents."""
+        self.cases.pop(thread_id, None)
 
     # ------------------------------------------------------------------ policy
     def _evaluate(self, env):

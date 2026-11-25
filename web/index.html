@@ -166,6 +166,10 @@ pre{margin:6px 0 0;background:var(--soft);padding:8px;border-radius:8px;overflow
 .res b{color:var(--ink)}
 .shield{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;flex:none}
 .shield.ok{background:var(--ok-soft)} .shield.bad{background:var(--err-soft)} .shield.wait{background:var(--soft)}
+.a2acard{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;border:1px dashed var(--payer);border-radius:12px;padding:8px 12px;background:var(--payer-soft)}
+.a2acard a{color:var(--payer);font-weight:600}
+.a2acard .tagx{background:var(--card);border-radius:6px;padding:1px 7px;font-family:ui-monospace,Menlo,monospace;font-size:11.5px}
+.sys.a2a{color:var(--payer)}
 .edge.ov{stroke:var(--human);stroke-dasharray:2 6;opacity:.55}
 .edge.ov.hot{opacity:1;stroke-width:2.5}
 .cnt{font-size:11px;font-weight:700;paint-order:stroke;stroke:var(--card);stroke-width:4px}
@@ -255,6 +259,7 @@ h3{font-size:11px}
   <header>
     <h1>Prior Auth Watchtower<small>Who watches the swarm? Agents do the routine work; people make the judgment calls.</small></h1>
     <div class="controls">
+      <span class="chip">protocol <b id="a2aChip">A2A</b></span>
       <span class="chip">signatures <b id="cryptoChip">…</b></span>
       <span class="chip">index <b id="indexChip">…</b></span>
       <span class="seg" title="Who answers human checkpoints">
@@ -269,7 +274,7 @@ h3{font-size:11px}
   </header>
 
   <div class="stats">
-    <div class="card stat"><div class="v" id="stMsgs" style="color:var(--prov)">0</div><div class="l">agent-to-agent messages</div></div>
+    <div class="card stat"><div class="v" id="stMsgs" style="color:var(--prov)">0</div><div class="l">A2A messages between agents</div></div>
     <div class="card stat"><div class="v" id="stHuman" style="color:var(--human)">0</div><div class="l">human touches (judgment only)</div></div>
     <div class="card stat"><div class="v" id="stAuto">0</div><div class="l">requests closed with zero human touches</div></div>
     <div class="card stat"><div class="v" id="stSpoof">0</div><div class="l">spoofed agents blocked</div></div>
@@ -293,7 +298,7 @@ h3{font-size:11px}
       <path id="e_pu" class="edge ov" d="M170,204 L170,350"/>
       <path id="e_yc" class="edge ov" d="M800,204 L770,350"/>
       <path id="e_ys" class="edge ov" d="M866,204 L904,350"/>
-      <text class="lbl3" x="500" y="190" text-anchor="middle">signed A2A envelopes · no human in this path</text>
+      <text class="lbl3" x="500" y="190" text-anchor="middle">A2A v1.0 · JSON-RPC SendMessage over HTTP · no human in this path</text>
 
       <!-- NANDA Index -->
       <g id="n_index" style="color:var(--index)">
@@ -307,12 +312,14 @@ h3{font-size:11px}
         <rect class="n-box" x="84" y="136" width="172" height="68" rx="12" fill="var(--prov-soft)" stroke="var(--prov)"/>
         <text class="lbl" x="170" y="164" text-anchor="middle">🤖 Provider agent</text>
         <text class="lbl2" x="170" y="182" text-anchor="middle">Riverside Health System</text>
+        <text class="lbl3" x="170" y="198" text-anchor="middle">A2A client</text>
       </g>
       <!-- Payer agent -->
       <g id="n_payer" style="color:var(--payer)">
         <rect class="n-box" x="744" y="136" width="172" height="68" rx="12" fill="var(--payer-soft)" stroke="var(--payer)"/>
         <text class="lbl" x="830" y="164" text-anchor="middle">🤖 Insurer agent</text>
         <text class="lbl2" x="830" y="182" text-anchor="middle">Example Health Plan</text>
+        <text class="lbl3" id="a2aSrv" x="830" y="198" text-anchor="middle">A2A server</text>
       </g>
       <!-- Rogue agent -->
       <g id="n_rogue" style="color:var(--rogue)">
@@ -362,6 +369,7 @@ h3{font-size:11px}
     <h2><span class="dot" style="background:var(--index)"></span>🌐 NANDA Index · DNS for agents</h2>
     <div class="sub">Like DNS maps a name to an address, the index maps an agent ID to its endpoint, skills and public key. Anyone can read it, but only the real agent can sign with the listed key.</div>
     <div class="recs" id="idxRecs"></div>
+    <div class="a2acard" id="a2aCard"></div>
     <div class="pills" id="idxLog"></div>
   </section>
 
@@ -423,8 +431,8 @@ h3{font-size:11px}
     <div class="g3">
       <div class="col" style="border-top:3px solid var(--ok)"><h4 style="color:var(--ok)">✅ What worked</h4><ul id="wuWorked"></ul></div>
       <div class="col" style="border-top:3px solid var(--warn)"><h4 style="color:var(--warn)">⚠️ What didn't (yet)</h4><ul>
-        <li>Payloads are FHIR-shaped JSON, not real Da Vinci PAS bundles</li>
-        <li>Agents run on one laptop; endpoints aren't publicly hosted</li>
+        <li>A2A messages carry FHIR-shaped JSON in a signed envelope, not real Da Vinci PAS bundles</li>
+        <li>A2A runs over loopback HTTP on one laptop; endpoints aren't publicly hosted</li>
         <li>Coverage policy is a single illustrative rule</li></ul></div>
       <div class="col" style="border-top:3px solid var(--index)"><h4 style="color:var(--index)">🚀 What's next</h4><ul>
         <li>Convert requests and decisions to Da Vinci PAS (CMS-0057-F, Jan 2027)</li>
@@ -441,6 +449,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&l
 const SVGNS = "http://www.w3.org/2000/svg";
 const api = (path, body) => fetch(path, body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)}).then(r => r.json());
 
+const loadedAt = Date.now() / 1000;
 let boot = null, fetched = 0, speed = 1, selPatient = "pt-1001", selCase = null, firstLoad = true;
 const queue = [];
 const cases = {};          // client view, built from *played* events
@@ -452,6 +461,13 @@ let t0 = null;
 async function init(){
   boot = await api("/api/bootstrap");
   $("#cryptoChip").textContent = boot.crypto;
+  $("#a2aChip").textContent = `A2A ${boot.a2a.version} · JSON-RPC`;
+  $("#a2aSrv").textContent = `A2A server :${new URL(boot.a2a.endpoint).port || 80}`;
+  const card = boot.a2a.card;
+  $("#a2aCard").innerHTML = `🪪 <b>Insurer's A2A Agent Card</b> <a href="${esc(boot.a2a.card_url)}" target="_blank" rel="noopener">${esc(boot.a2a.card_url)}</a>
+    <span class="tagx">${esc(card.supportedInterfaces[0].protocolBinding)} ${esc(card.supportedInterfaces[0].protocolVersion)}</span>
+    ${card.skills.map(sk => `<span class="tagx">skill: ${esc(sk.id)}</span>`).join("")}
+    <span style="color:var(--muted)">The index says <i>who</i> an agent is; the Agent Card says <i>how to talk to it</i>.</span>`;
   $("#indexChip").textContent = boot.index_label;
   drawIndex();
   const pol = Object.entries(boot.policy).map(([code,p]) => `<b>${esc(p.name)}</b> (CPT ${esc(code)}): ${esc(p.criteria_text)}. Proposed denials go to a clinician.`).join("<br>");
@@ -510,7 +526,12 @@ async function poll(){
     const st = await api(`/api/state?since=${fetched}`);
     setMode(st.auto, false);
     for (const ev of st.events){ fetched = Math.max(fetched, ev.seq); queue.push(ev); }
-    if (firstLoad){ firstLoad = false; while (queue.length) apply(queue.shift()); render(); }
+    if (firstLoad){
+      // History from before the page opened appears instantly; anything newer is animated.
+      firstLoad = false;
+      while (queue.length && queue[0].ts < loadedAt) apply(queue.shift());
+      render();
+    }
     $("#conn").hidden = true;
   }catch(e){ $("#conn").hidden = false; }
   setTimeout(poll, 400);
@@ -552,12 +573,16 @@ function pushTx(ev){
   const b = ev.env.body || {}, color = ev.env.type === "pa.rejected" ? "var(--err)" : statusColor(b.status);
   const tk = $("#ticker"); const e = tk.querySelector(".empty"); if (e) e.remove();
   const d = document.createElement("div"); d.className = "tx"; d.style.setProperty("--c", color);
-  d.innerHTML = `<div class="r1"><span class="mono">${esc(ev.env.type)}</span>${b.status ? badge(b.status) : ""}</div>
+  const isReply = ev.from_node === "payer", st = lastState[ev.case];
+  const head = isReply ? `Task ${shortState(st)}` : `SendMessage · ${ev.env.type}`;
+  d.innerHTML = `<div class="r1"><span class="mono">${esc(head)}</span>${b.status ? badge(b.status) : ""}</div>
     <div class="dir">${esc(NAMES[ev.from_node])} → ${esc(NAMES[ev.to_node])} · #${ev.case} · ${ev.from_node === "rogue" ? '<span class="bad-t">sig ✘ forged</span>' : '<span class="ok-t">sig ✔</span>'}</div>
     <div class="r2" title="${esc(b.summary || "")}">${esc(b.summary || "")}</div>`;
   d.onclick = () => { selCase = ev.case; render(); };
   tk.prepend(d); while (tk.children.length > 12) tk.lastChild.remove();
 }
+const lastState = {};
+const shortState = st => st ? st.replace(/^TASK_STATE_/, "").toLowerCase().replace(/_/g, "-") : "?";
 const statusColor = s => ({APPROVED:"var(--ok)", PENDED:"var(--warn)", DENIED:"var(--err)", REJECTED:"var(--err)"}[s] || "var(--prov)");
 
 function movePacket(key, color, label, ms){
@@ -602,7 +627,9 @@ async function animate(ev){
   switch (ev.kind){
     case "send": {
       const b = ev.env.body || {};
-      const label = ev.env.type + (b.status ? " · " + b.status : "");
+      const label = ev.from_node === "payer"
+        ? `Task ${shortState(lastState[ev.case])}` + (b.status ? " · " + b.status : "")
+        : `SendMessage · ${ev.env.type}`;
       const color = ev.env.type === "pa.rejected" ? "var(--err)" : statusColor(b.status);
       counts[ev.from_node].s++; drawCounts(); pushTx(ev);
       await movePacket(`${ev.from_node}>${ev.to_node}`, color, label, 1300);
@@ -656,6 +683,16 @@ async function animate(ev){
       return wait(500);
     }
     case "case": return wait(150);
+    case "agent_card": {
+      await movePacket(`${ev.by}>payer`, "var(--payer)", "GET agent-card.json", 800);
+      flash("n_payer");
+      await movePacket(`payer>${ev.by}`, "var(--payer)", "Agent Card", 700);
+      return;
+    }
+    case "a2a":
+      lastState[ev.case] = ev.state;
+      if (ev.error) floatBadge(ev.by === "rogue" ? "rogue" : "provider", `A2A error ${ev.error.code}`, "var(--err)", 2600);
+      return wait(80);
     default: return wait(60);
   }
 }
@@ -756,6 +793,7 @@ function renderWrapup(all, prov, rogue){
   const blocked = rogue.filter(c => c.status === "REJECTED").length;
   const items = [
     `Agents found each other and checked identity through the NANDA Index (${lookups.length} lookup${lookups.length === 1 ? "" : "s"})`,
+    `They talked A2A ${boot.a2a.version}: Agent Card discovery, JSON-RPC SendMessage, and multi-turn tasks (input-required → completed)`,
     `${msgs} signed agent-to-agent messages, ${touches} human touch${touches === 1 ? "" : "es"}`,
     prov.length ? `${auto} of ${prov.length} request${prov.length === 1 ? "" : "s"} closed with no person involved` : "Routine requests need no person at all",
     "People were asked only about denials and releasing more patient data",
@@ -779,6 +817,7 @@ function steps(c){
   const out = [
     ["🤖", "delegated", true],
     ["🌐", "found insurer", has("index", e => e.op === "find")],
+    ["🪪", "A2A card", has("agent_card")],
     ["📤", "sent", has("send", e => e.from_node === "provider")],
     ["🛡️", "verified", has("ok", e => /signature verified/.test(e.text))],
     ["⚖️", "policy check", has("step", e => /checking criteria/.test(e.text)) || decided],
@@ -864,6 +903,14 @@ function renderTimeline(){
         break;
       }
       case "index": out.push(`<div class="sys idx">🔎 ${describe(ev, c)}</div>`); break;
+      case "agent_card": out.push(`<div class="sys a2a">🪪 Read the insurer's A2A Agent Card: <b>${esc(ev.card.name)}</b> · ${esc(ev.interface.protocolBinding)} ${esc(ev.interface.protocolVersion)} · skill ${esc((ev.card.skills || []).map(x => x.id).join(", "))}
+        <details><summary>${esc(ev.url)}</summary><pre style="text-align:left">${esc(JSON.stringify(ev.card, null, 2))}</pre></details></div>`); break;
+      case "a2a": {
+        const trim = o => JSON.parse(JSON.stringify(o, (k, v) => k === "sig" && typeof v === "string" ? v.slice(0, 16) + "…" : v));
+        out.push(`<div class="sys a2a">⇄ A2A <b>${esc(ev.method)}</b> → ${esc(ev.url)} · ${ev.error ? `<span class="bad-t">error ${esc(ev.error.code)}: ${esc(ev.error.message)}</span>` : `task <span class="mono">${esc(String(ev.task_id).slice(0, 8))}</span> · <b>${esc(ev.state)}</b>`}
+          <details><summary>JSON-RPC request and response</summary><pre style="text-align:left">${esc(JSON.stringify({request: {jsonrpc: "2.0", method: ev.method, params: trim(ev.request)}, response: trim(ev.response)}, null, 2))}</pre></details></div>`);
+        break;
+      }
       case "ok": case "bad": out.push(`<div class="sys">${describe(ev, c)}</div>`); break;
       case "step": if (/searched EMR|pulled/.test(ev.text)) out.push(`<div class="sys">🗂 ${describe(ev, c)}</div>`); break;
       case "human": out.push(`<div class="ovs"><b>👤 Oversight · ${esc(ev.who)}</b><br>${esc(ev.question)}</div>`); break;

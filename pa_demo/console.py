@@ -92,3 +92,18 @@ def prompt(s):
 
 def dump(obj):
     print(_c("2", json.dumps(obj, indent=2)))
+
+
+def agent_card(url, card, iface):
+    _emit("agent_card", url=url, card=card, interface=iface)
+    skills = ", ".join(s["id"] for s in card.get("skills", []))
+    print(_c("2", f"    ⇄ A2A Agent Card {url}: {card.get('name')} · "
+                  f"{iface['protocolBinding']} {iface['protocolVersion']} · skills: {skills}"))
+
+
+def a2a(method, url, task_id=None, context_id=None, state=None, request=None, response=None, error=None):
+    _emit("a2a", method=method, url=url, task_id=task_id, context_id=context_id, state=state,
+          request=request, response=response, error=error)
+    tail = (f"error {error.get('code')}: {error.get('message')}" if error
+            else f"task {str(task_id)[:8]} {state}")
+    print(_c("2", f"    ⇄ A2A {method} {url} → {tail}"))

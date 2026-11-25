@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Watchtower web app: provider portal, payer agent and a spoofed agent, shown live.
 
-The provider submits a prior auth from the browser and watches its status. The same
-agents as run_demo.py do the work; every signed message, index lookup and human
-checkpoint is animated on a graph. Human checkpoints become buttons in the page.
+The provider delegates a prior auth from the browser and watches its status. The same
+agents as run_demo.py do the work, talking A2A v1.0: the insurer agent is a real A2A
+server (Agent Card + JSON-RPC SendMessage) on loopback port 8765, and the provider and
+spoofed agents are A2A clients. Every A2A exchange, index lookup and human checkpoint is
+animated on a graph. Human checkpoints become buttons in the page.
 
   python web_app.py                  # http://127.0.0.1:8080  (offline MockIndex)
   python web_app.py --live-index     # discover/verify through api.nandaindex.org
-  python web_app.py --host 0.0.0.0 --port 9000
+  python web_app.py --a2a-port 9765  # move the insurer's A2A server
 
 Stdlib only (plus optional `cryptography` for real Ed25519). Data is synthetic.
 """
@@ -25,14 +27,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from pa_demo import a2a
 from pa_demo import console as c
 from pa_demo import emr
 from pa_demo.identity import CRYPTO_MODE, KeyPair
 from pa_demo.index import MockIndex
 from pa_demo.oversight import Oversight
-from pa_demo.payer_agent import POLICY, PayerAgent
+from pa_demo.payer_agent import A2A_DESCRIPTION, A2A_SKILLS, POLICY, PayerAgent
 from pa_demo.provider_agent import ProviderAgent, SpoofedProvider
-from pa_demo.transport import Transport
 
 PAYER_ORG = "Example Health Plan"
 HTML_FILE = Path(__file__).parent / "web" / "index.html"
@@ -55,21 +57,6 @@ class CheckpointTimeout(RuntimeError):
     """No person answered a checkpoint: stop the task rather than decide for them."""
 
 
-class LocalTransport(Transport):
-    """Only delivers to agents running in this process.
-
-    The watchtower hosts both agents itself, so an endpoint taken from the index that is
-    not one of ours (e.g. an http:// URL in a live-index record) is refused instead of
-    being sent patient data.
-    """
-
-    def __call__(self, env, endpoint):
-        if endpoint not in self.local:
-            raise RuntimeError(f"refusing to send to {endpoint!r}: not an agent hosted by this "
-                               f"watchtower (register the agents without --http)")
-        return super().__call__(env, endpoint)
-
-
 def _node(label: str) -> str:
     label = label.lower()
     return "rogue" if label.startswith("rogue") else "payer" if label.startswith("payer") else "provider"
@@ -83,6 +70,7 @@ class EventLog:
         self.cases: dict[int, dict] = {}
         self._case_ids = itertools.count(1)
         self._seq = itertools.count(1)   # never reset, so open tabs keep a valid cursor
+        self.thread_case: dict[str, int] = {}   # envelope thread_id -> case (for the A2A server thread)
 
     def record(self, kind: str, data: dict, case_id=None) -> dict:
         with self.lock:
@@ -118,6 +106,10 @@ class EventLog:
         """Turn console output from the agents into structured events."""
         if kind == "send":
             env = data["env"]
+            case = getattr(_ctx, "case", None)
+            if case is not None:
+                with self.lock:
+                    self.thread_case.setdefault(env["thread_id"], case)
             self.record("send", {
                 "from_node": _node(data["frm"]), "to_node": _node(data["to"]),
                 "from_label": data["frm"], "to_label": data["to"],
@@ -127,6 +119,8 @@ class EventLog:
             text = data["text"]
             actor = text.split(":", 1)[0] if re.match(r"^(provider|payer):", text) else None
             self.record(kind, {"text": text, "node": actor})
+        elif kind in ("a2a", "agent_card"):
+            self.record(kind, {**data, "by": getattr(_ctx, "actor", "provider")})
         else:
             self.record(kind, data)
 
@@ -206,12 +200,14 @@ class WebOversight(Oversight):
 
 # ------------------------------------------------------------------ app
 class App:
-    def __init__(self, live_index: bool):
+    def __init__(self, live_index: bool, a2a_port: int = 8765):
         self.log = EventLog()
         c.subscribe(self.log.on_console)
         self.oversight = WebOversight(self.log)
-        self.transport = LocalTransport()
-        endpoint = "inproc://payer"
+        # The insurer agent is a real A2A server on loopback; the provider and the spoofed
+        # agent are A2A clients that may only contact it (never a URL taken from the index).
+        endpoint = self.a2a_endpoint = f"http://127.0.0.1:{a2a_port}/a2a"
+        self.transport = a2a.A2AClient(allowed={endpoint}, timeout=CHECKPOINT_TIMEOUT + 60)
         if live_index:
             import run_demo
             from pa_demo import nanda_index as ni
@@ -236,7 +232,15 @@ class App:
             inner.register(self.payer.facts)
             inner.register(self.provider.facts)
             self.index_label = "MockIndex (offline)"
-        self.transport.register_local(endpoint, self.payer)
+        self.a2a_server = a2a.A2AServer(self.payer, A2A_SKILLS, A2A_DESCRIPTION,
+                                        on_request=self._payer_context)
+        self.a2a_httpd = a2a.serve(self.a2a_server, host="127.0.0.1", port=a2a_port)
+
+    def _payer_context(self, env):
+        """The A2A server handles each request on its own thread: tell it which case it's on."""
+        with self.log.lock:
+            _ctx.case = self.log.thread_case.get(env.get("thread_id"))
+        _ctx.actor = "payer"
 
     # -- actions
     def _run(self, case, actor, fn):
@@ -286,11 +290,15 @@ class App:
     def reset(self) -> bool:
         # Same lock as new_case, so a task can't start between the check and the clear.
         with self.log.lock:
-            if self.oversight.pending or any(cs["running"] for cs in self.log.cases.values()):
+            if (self.oversight.pending or self.a2a_server.active
+                    or any(cs["running"] for cs in self.log.cases.values())):
                 return False
             self.log.events.clear()
             self.log.cases.clear()
             self.transport.trace.clear()
+            self.transport.frames.clear()
+            self.log.thread_case.clear()
+            self.a2a_server.clear()
             self.oversight.touches.clear()
             self.payer.cases.clear()   # drop the insurer's copies of the clinical documents
         return True
@@ -308,7 +316,9 @@ class App:
             })
         return {"patients": patients, "agents": self.index.all(), "crypto": CRYPTO_MODE,
                 "index_label": self.index_label, "policy": POLICY, "payer_org": PAYER_ORG,
-                "rogue_id": ROGUE_ID}
+                "rogue_id": ROGUE_ID,
+                "a2a": {"version": a2a.A2A_VERSION, "endpoint": self.a2a_endpoint,
+                        "card_url": a2a.card_url(self.a2a_endpoint), "card": self.a2a_server.card}}
 
     def state(self, since: int) -> dict:
         with self.log.lock:
@@ -320,12 +330,15 @@ class App:
     def trace(self) -> dict:
         with self.log.lock:
             return {"index": self.index.all(), "messages": list(self.transport.trace),
+                    "a2a": list(self.transport.frames),
                     "human_touches": list(self.oversight.touches),
                     "cases": [dict(cs) for cs in self.log.cases.values()]}
 
 
 def make_handler(app: App):
     class Handler(BaseHTTPRequestHandler):
+        timeout = 15   # seconds; a stalled client can't hold a thread forever
+
         def _send(self, code, payload, ctype="application/json"):
             out = payload if isinstance(payload, bytes) else json.dumps(payload, default=str).encode()
             self.send_response(code)
@@ -396,6 +409,8 @@ def main():
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--live-index", action="store_true",
                     help="use the live NANDA Index (agents must be registered; see README)")
+    ap.add_argument("--a2a-port", type=int, default=8765,
+                    help="port for the insurer agent's A2A server (loopback only)")
     ap.add_argument("--open", action="store_true", help="open the browser")
     ap.add_argument("--allow-remote", action="store_true",
                     help="allow a non-loopback --host (the API has no login: trusted networks only)")
@@ -404,13 +419,15 @@ def main():
         sys.exit("error: the watchtower API has no authentication, so it only binds to loopback.\n"
                  "  Add --allow-remote to serve it on a trusted network anyway.")
     try:
-        app = App(args.live_index)
+        app = App(args.live_index, args.a2a_port)
     except (RuntimeError, OSError) as e:
         sys.exit(f"error: {e}")
     server = ThreadingHTTPServer((args.host, args.port), make_handler(app))
     url = f"http://{'127.0.0.1' if args.host == '0.0.0.0' else args.host}:{args.port}/"
     c.banner(f"Prior-auth watchtower running at {url}")
     c.step(f"signatures: {CRYPTO_MODE} · index: {app.index_label}")
+    c.step(f"insurer agent: A2A {a2a.A2A_VERSION} server at {app.a2a_endpoint} "
+           f"(Agent Card: {a2a.card_url(app.a2a_endpoint)})")
     if args.open:
         webbrowser.open(url)
     try:

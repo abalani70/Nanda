@@ -3,7 +3,7 @@
 
   python run_demo.py                 # all scenarios, scripted human decisions
   python run_demo.py --interactive   # you play the humans (y/n prompts)
-  python run_demo.py --http          # payer agent served over real HTTP
+  python run_demo.py --http          # payer agent is a real A2A server over HTTP
   python run_demo.py --case B        # one scenario: A, B, C or S (spoof)
   python run_demo.py --mock-index    # offline: in-memory index instead of api.nandaindex.org
   python run_demo.py --register      # publish both agents' AgentFacts to the NANDA Index
@@ -23,9 +23,9 @@ from pa_demo import nanda_index as ni
 from pa_demo.identity import CRYPTO_MODE, KeyPair
 from pa_demo.index import MockIndex
 from pa_demo.oversight import Oversight
-from pa_demo.payer_agent import PayerAgent
+from pa_demo.payer_agent import A2A_DESCRIPTION, A2A_SKILLS, PayerAgent
 from pa_demo.provider_agent import ProviderAgent, SpoofedProvider
-from pa_demo.transport import Transport, serve
+from pa_demo import a2a
 
 PAYER_ORG = "Example Health Plan"
 
@@ -40,7 +40,7 @@ SCENARIOS = {
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--interactive", action="store_true", help="prompt for human decisions")
-    ap.add_argument("--http", action="store_true", help="serve payer agent over HTTP")
+    ap.add_argument("--http", action="store_true", help="serve the payer agent as an A2A server over HTTP")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--case", choices=list(SCENARIOS), action="append",
                     help="run only these scenarios (repeatable)")
@@ -58,8 +58,9 @@ def main():
     oversight = Oversight(interactive=args.interactive,
                           scripted={"confirm_denial": not args.clinician_overrides,
                                     "release_phi": True})
-    transport = Transport()
     endpoint = f"http://127.0.0.1:{args.port}/a2a" if args.http else "inproc://payer"
+    # Only our own payer endpoint may receive requests, whatever an index entry says.
+    transport = a2a.A2AClient(allowed={endpoint})
 
     if args.mock_index and not args.register:
         index = MockIndex()
@@ -91,15 +92,17 @@ def main():
         preflight(index, [payer, provider])
         index_label = f"NANDA Index {cfg['base_url']}"
 
+    a2a_server = a2a.A2AServer(payer, A2A_SKILLS, A2A_DESCRIPTION)
     if args.http:
-        serve(payer, port=args.port)
+        a2a.serve(a2a_server, port=args.port)
     else:
-        transport.register_local(endpoint, payer)
+        transport.register_local(endpoint, a2a_server)
 
     c.banner("Prior authorization across two organizations — NANDA-style agents + HAL oversight")
     c.step(f"signatures: {CRYPTO_MODE}"
            + ("  (install `cryptography` for real Ed25519)" if CRYPTO_MODE != "ed25519" else ""))
-    c.step(f"transport: {'HTTP ' + endpoint if args.http else 'in-process'}")
+    c.step(f"transport: A2A {a2a.A2A_VERSION} JSON-RPC "
+           + (f"over HTTP {endpoint}" if args.http else "(in-process; --http for a real server)"))
     c.step(f"index: {index_label}")
     for f in index.all():
         c.step(f"index: {f['agent_id']}  [{f['organization']}]  caps={f['capabilities']}")
@@ -134,7 +137,7 @@ def main():
           + ", ".join(f"{k.lower()}={v}" for k, v in counts.items()))
 
     with open("trace.json", "w") as fh:
-        json.dump({"index": index.all(), "messages": transport.trace,
+        json.dump({"index": index.all(), "messages": transport.trace, "a2a": transport.frames,
                    "human_touches": oversight.touches, "results": results}, fh, indent=2)
     c.step("full signed message trace written to trace.json")
 

@@ -1,7 +1,7 @@
 # Prior Auth, Agent-to-Agent — HALHack demo
 
 A provider agent submits a prior-authorization request built from EMR data to a payer
-agent at a different organization. The payer verifies who is calling, checks policy,
+agent at a different organization, over the **A2A (Agent2Agent) protocol v1.0**. The payer verifies who is calling, checks policy,
 and answers **APPROVED**, **PENDED (send more info)**, or **DENIED**. Humans only see
 the decisions that need judgment (HAL 2 — one human supervising a team of agents).
 
@@ -17,7 +17,7 @@ python run_demo.py              # all 4 scenarios, scripted humans
 | Option | What it does |
 |---|---|
 | `--interactive` | You play the humans (y/n prompts) — best for a live demo |
-| `--http` | Payer agent served over real HTTP (`POST /a2a`) |
+| `--http` | Payer agent is a real A2A server over HTTP (Agent Card + JSON-RPC at `http://127.0.0.1:8765/a2a`) |
 | `--case B` | Run one scenario (A, B, C, S; repeatable) |
 | `--clinician-overrides` | Scripted clinician overturns the proposed denial in C |
 | `--mock-index` | Offline: in-memory `MockIndex` instead of the live NANDA Index |
@@ -36,16 +36,18 @@ The API has no login, so the server only binds to loopback; add `--allow-remote`
 checkpoint within 15 minutes the task stops with an error: nothing is released or decided
 on a person's behalf.
 
-Same agents, shown live in the browser. The top band is the **agent layer**: the provider agent,
-the insurer agent, the **NANDA Index** (the "DNS for agents") and a **spoofed agent**. Every signed
-message moves across the graph as a packet, and each agent shows how many it sent and received. The
+Same agents, shown live in the browser. The insurer agent runs as a real A2A server on
+`http://127.0.0.1:8765` (move it with `--a2a-port`); its Agent Card is at
+`/.well-known/agent-card.json`. The top band is the **agent layer**: the provider agent,
+the insurer agent, the **NANDA Index** (the "DNS for agents") and a **spoofed agent**. Every A2A
+call (Agent Card fetch, `SendMessage`, the task state that comes back) moves across the graph as a packet, and each agent shows how many it sent and received. The
 bottom band is the **human oversight layer**: the provider overseer delegates a task and approves PHI
 release, a clinician decides any proposed denial, and a security analyst gets identity alerts.
 Checkpoints show up as buttons on the page (or switch to "Scripted humans").
 
 - Provider overseer: pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
 - Spoofed agent: **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
-- Agent-to-agent conversation: a chat view of each task, with the full signed envelopes. `/api/trace` gives the JSON.
+- Agent-to-agent conversation: a chat view of each task, with the signed envelopes and the raw A2A JSON-RPC request/response. `/api/trace` gives the JSON.
 
 ## Scenarios
 
@@ -56,7 +58,21 @@ Checkpoints show up as buttons on the page (or switch to "Scripted humans").
 | C | pt-1003 | 0 weeks therapy → agent proposes **DENIAL** → clinician confirms or overturns | payer clinician (MD) |
 | S | — | Rogue agent claims to be the provider but signs with the wrong key → **REJECTED** | payer security alert |
 
-## How it maps to NANDA / HAL
+## How it maps to NANDA / HAL / A2A
+
+- **A2A v1.0** → `pa_demo/a2a.py` (stdlib only), JSON-RPC binding:
+  - The payer agent is an A2A **server**: Agent Card at `/.well-known/agent-card.json` (skill
+    `prior-auth.review`, `supportedInterfaces` → JSONRPC 1.0), and `SendMessage` / `GetTask`.
+  - The provider (and the spoofed agent) are A2A **clients**: they read the Agent Card, then send
+    `SendMessage` with the `A2A-Version: 1.0` header.
+  - Decisions map to task states: APPROVED/DENIED → `TASK_STATE_COMPLETED` (decision also in an
+    artifact), PENDED → `TASK_STATE_INPUT_REQUIRED` (the provider continues the **same task** by
+    `taskId` with the extra documents), identity failure → `TASK_STATE_REJECTED`.
+  - Each A2A message carries the signed envelope as a data part
+    (`application/vnd.halhack.signed-envelope+json`). A2A has no message signing of its own, so the
+    receiver still checks the sender's key in the NANDA Index: the index says *who* an agent is,
+    the Agent Card says *how to talk to it*.
+  - Without `--http` the CLI sends the same A2A JSON-RPC frames in-process (offline-safe).
 
 - **NANDA Index** → `pa_demo/nanda_index.py`: client for `api.nandaindex.org`
   (search → resolve → index record). `--mock-index` swaps in `pa_demo/index.py` for offline runs.
@@ -65,7 +81,7 @@ Checkpoints show up as buttons on the page (or switch to "Scripted humans").
   sender's published key (both directions).
 - **HAL checkpoints** → `pa_demo/oversight.py`: denials need a clinician, PHI release needs staff,
   identity failures alert a human.
-- **Trace** → `trace.json`: every signed message, human touch, and outcome.
+- **Trace** → `trace.json`: every signed message, every A2A request/response, human touches, outcomes.
 
 ## Using the live NANDA Index
 
@@ -100,7 +116,8 @@ One-time setup (domain):
 
 Keys are stored in `~/.pa-demo/keys/` (outside the repo) and settings in `~/.pa-demo/index.json`.
 Register with the same `--http` setting you will demo with, because the endpoint is part of the
-published AgentFacts. If the entries are missing or don't match the local keys, the demo stops with
+published AgentFacts. The web watchtower always runs the payer as an A2A server on
+`http://127.0.0.1:8765/a2a`, so for `web_app.py --live-index` register with `--http`. If the entries are missing or don't match the local keys, the demo stops with
 a message. On stage without wifi, use `--mock-index`.
 
 Env overrides: `NANDA_INDEX_URL` (e.g. a self-hosted index), `NANDA_DOMAIN`, `NANDA_ORG_PREFIX`
@@ -126,6 +143,6 @@ pa_demo/emr.py            synthetic EMR (3 patients)
 pa_demo/provider_agent.py provider agent + spoofed agent
 pa_demo/payer_agent.py    payer agent + coverage policy
 pa_demo/oversight.py      human checkpoints
-pa_demo/transport.py      in-process / HTTP transport
+pa_demo/a2a.py            A2A v1.0 server + client (JSON-RPC, Agent Card, tasks)
 pa_demo/console.py        readable output
 ```

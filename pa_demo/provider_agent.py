@@ -1,7 +1,7 @@
 """Provider (health system) prior-auth agent.
 
-Discovers the payer's agent in the index, builds a PA request from the EMR,
-submits it, and handles the payer's answer — including going back to the EMR
+Discovers the payer's agent in the NANDA Index, reads its A2A Agent Card,
+builds a PA request from the EMR, submits it over A2A (SendMessage), and handles the payer's answer — including going back to the EMR
 for more documentation when the payer pends the request.
 """
 from __future__ import annotations
@@ -34,6 +34,10 @@ class ProviderAgent:
         payer = matches[0]
         c.ok(f"provider: discovered {payer['agent_id']} via index "
              f"(key {payer['key_alg']}, endpoint {payer['endpoint']})")
+        card = self.transport.agent_card(payer["endpoint"])   # A2A discovery: what can it do?
+        if not any(s.get("id") == "prior-auth.review" for s in card.get("skills", [])):
+            raise RuntimeError(f"{payer['agent_id']}'s Agent Card has no prior-auth.review skill")
+        c.ok(f"provider: A2A Agent Card for {card['name']} offers prior-auth.review")
         return payer
 
     def _build_request(self, patient_id: str) -> dict:
@@ -113,6 +117,8 @@ class SpoofedProvider:
             "red_flags": ["fabricated"],
             "documents": [{"type": "pt-notes", "text": "forged", "conservative_therapy_weeks": 12}],
         }
+        if hasattr(self.transport, "agent_card"):
+            self.transport.agent_card(payer["endpoint"])   # the card is public: attackers read it too
         env = seal(self.claimed_id, payer["agent_id"], "pa.submit", body, self.keys)
         c.send(env, "Rogue agent (claims Riverside)", "Payer agent")
         reply = self.transport(env, payer["endpoint"])
