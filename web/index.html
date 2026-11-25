@@ -255,7 +255,7 @@ h3{font-size:11px}
 html,body{height:100%}
 .wrap{max-width:none;height:100vh;display:flex;flex-direction:column;gap:10px;padding:12px 14px}
 header{flex:none;margin:0;padding:10px 18px;border-radius:16px;flex-wrap:nowrap}
-@media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px} .striphd .sub{display:none}}
+@media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px}}
 h1{font-size:20px}
 h1 small{font-size:12.5px}
 .stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,1fr) minmax(560px,2.4fr) minmax(260px,1fr);gap:12px}
@@ -267,23 +267,17 @@ h1 small{font-size:12.5px}
 .center .stat .l{font-size:11.5px}
 .center .stat::after{width:60px;height:60px;right:-16px;top:-16px}
 .center .graph{margin:0;flex:none;padding:6px 6px 0}
-.graph svg{max-height:calc(100vh - 612px);min-height:240px}
+.graph svg{max-height:calc(100vh - 500px);min-height:240px}
 .legend{padding:2px 12px 6px;gap:10px;font-size:11.5px}
 .ticker{padding:0 10px 10px;min-height:52px}
 .tx{width:200px;padding:5px 8px;font-size:11.5px}
 .center .tx .r2{display:none}
-.strip{flex:none;padding:10px 14px}
-.striphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.striphd h2{margin:0}
-.striphd .grow{flex:1}
-.strip .btn{padding:7px 12px}
 .attempts{display:flex;gap:8px;overflow-x:auto;margin-top:8px}
 .att{flex:0 0 auto;max-width:420px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:12px;cursor:pointer;animation:slidein .4s ease-out}
 .att.sel{border-color:var(--rogue);box-shadow:0 0 0 3px var(--rogue-soft)}
 .att .shield{width:28px;height:28px;font-size:14px;border-radius:8px}
 .att .t2{color:var(--muted)}
 .att .grow{min-width:0}
-.strip .empty{padding:6px 0 0}
 .side .sub{font-size:12px;margin-bottom:10px}
 .side h3{margin:12px 0 6px}
 .side .chart{font-size:12px;padding:8px 10px}
@@ -322,21 +316,25 @@ h1 small{font-size:12.5px}
 .verdict{margin-top:6px;border-radius:10px;padding:7px 10px;font-weight:700;font-size:12px}
 .verdict.ok{background:var(--ok-soft);color:var(--ok)} .verdict.bad{background:var(--err-soft);color:var(--err)}
 .authx .foot{font-size:11px;color:var(--muted);margin-top:6px}
-/* ---------- authentication exchange, both directions, under the animation ---------- */
-.authrow{flex:none;padding:8px 12px}
-.authrow .ahd{display:flex;align-items:baseline;gap:10px;font-weight:750;font-size:13px;margin-bottom:4px}
-.authrow .ahd small{font-weight:500;color:var(--muted);font-size:11px}
-.arow{display:grid;grid-template-columns:118px repeat(4,minmax(0,1fr)) 150px;gap:6px;align-items:stretch;padding:4px 0;border-top:1px dashed var(--line)}
-.arow .dir{min-width:0;overflow-wrap:anywhere;font-size:11px;font-weight:700;line-height:1.25;display:flex;flex-direction:column;justify-content:center}
-.arow .dir small{font-weight:500;color:var(--muted)}
-.arow .st{background:var(--soft);border-radius:8px;padding:4px 7px;font-size:11px;line-height:1.3;min-width:0;position:relative;overflow:hidden;overflow-wrap:anywhere}
-.arow .st .lb{font-weight:700;font-size:10.5px;color:var(--muted);overflow-wrap:anywhere}
-.arow .st .mm{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--faint);overflow-wrap:anywhere}
-.arow .st.ok{background:var(--ok-soft)} .arow .st.bad{background:var(--err-soft)}
-.arow .vd{border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;display:flex;align-items:center;line-height:1.25}
-.arow .vd.ok{background:var(--ok-soft);color:var(--ok)} .arow .vd.bad{background:var(--err-soft);color:var(--err)} .arow .vd.na{background:var(--soft);color:var(--muted);font-weight:500}
-.arow .fp{font-size:10.5px}
-@media (max-width:1500px){.arow{grid-template-columns:96px repeat(4,minmax(0,1fr)) 120px}}
+/* ---------- transaction log under the animation ---------- */
+.txlog{flex:none;padding:8px 12px}
+.txhd{font-weight:750;font-size:13px;margin-bottom:4px}
+.txhd small{font-weight:500;color:var(--muted);font-size:11px;margin-left:6px}
+.txr{display:grid;grid-template-columns:62px 34px minmax(0,1.2fr) minmax(0,1.7fr) 88px 92px 92px minmax(0,1fr);gap:6px;align-items:center;
+  padding:3px 6px;font-size:11px;border-top:1px solid var(--soft);cursor:pointer;min-width:0}
+.txr > span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.txr:hover{background:var(--soft)} .txr.sel{background:var(--prov-soft)}
+.txcols{cursor:default;font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;border-top:0}
+.txcols:hover{background:none}
+.txrows{max-height:clamp(88px, calc(100vh - 797px), 136px);overflow-y:auto}
+.txr .tm{color:var(--faint);font-variant-numeric:tabular-nums}
+.txr .cs{color:var(--muted);font-weight:700}
+.txr .a2{color:var(--muted)}
+.txr .na{color:var(--faint)}
+.txr .fp{font-size:10px}
+.txr .badge{font-size:10px;padding:1px 6px}
+.w-provider{color:var(--prov)} .w-payer{color:var(--payer)} .w-rogue{color:var(--rogue)}
+@media (max-width:1500px){.txr{grid-template-columns:56px 30px minmax(0,1.1fr) minmax(0,1.5fr) 80px 84px 84px minmax(0,1fr)}}
 .center .stat{padding:7px 12px;display:flex;align-items:baseline;gap:8px}
 .center .stat .v{font-size:20px}
 .center .stat .l{font-size:12px}
@@ -355,6 +353,14 @@ h1 small{font-size:12.5px}
 .side .track .stp .ic{width:22px;height:22px;font-size:11px}
 .side .track .stp::before{top:10px}
 .ptasks:empty{display:none}
+.att{animation:none}
+.tabs{display:flex;gap:4px;margin:-4px -4px 12px;padding:3px;background:var(--soft);border-radius:12px}
+.tab{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:650;color:var(--muted);position:relative;white-space:nowrap}
+.tab.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.15)}
+.tab[data-tab="rogue"].on{color:var(--rogue)}
+.tabdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--human);margin-left:4px;vertical-align:1px;animation:pulse 1.2s infinite}
+.tabdot[hidden]{display:none}
+#tabRogue .attack .btn{width:100%}
 </style>
 </head>
 <body>
@@ -379,7 +385,12 @@ h1 small{font-size:12.5px}
 
   <div class="stage">
     <!-- PROVIDER (left) -->
-    <section class="card panel prov side">
+    <section class="card panel prov side" id="leftPanel">
+      <div class="tabs" role="tablist">
+        <button class="tab on" role="tab" data-tab="prov" id="tabBtnProv">🏥 Provider overseer <span class="tabdot" id="provDot" hidden></span></button>
+        <button class="tab" role="tab" data-tab="rogue" id="tabBtnRogue">🕵️ Spoofed agent</button>
+      </div>
+      <div id="tabProv">
       <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
       <div class="sub">Hand the task to your agent. It pulls the chart, finds the insurer's agent and negotiates with it. You're only asked about decisions that need a person.</div>
       <div class="submit-row top">
@@ -392,6 +403,20 @@ h1 small{font-size:12.5px}
       <h3>Our agent's identity &amp; the A2A card it reads</h3>
       <div class="idcard" id="provId"></div>
       <div class="a2acard provcard" id="provCard"></div>
+      </div>
+      <div id="tabRogue" hidden>
+        <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent · attacker</h2>
+        <div class="sub">Finds the insurer's endpoint in the public NANDA Index and sends a forged request with a fabricated clinical note. It can use any agent ID, but it can only sign with its own key.</div>
+        <div class="attack">
+          <button class="btn danger" data-attack="impersonate">Impersonate Riverside<small>uses Riverside's agent ID, signs with its own key</small></button>
+          <button class="btn ghost-danger" data-attack="unregistered">Unregistered agent<small>an agent ID that is not in the NANDA Index</small></button>
+        </div>
+        <h3>The attacker's identity</h3>
+        <div class="idcard" id="rogueId"></div>
+        <h3>Attempts</h3>
+        <div class="tasks" id="attempts"></div>
+        <div class="empty" id="attemptsEmpty">No attacks yet. Try one: both are stopped at the identity check.</div>
+      </div>
     </section>
 
     <!-- ANIMATION (center) -->
@@ -486,18 +511,7 @@ h1 small{font-size:12.5px}
       </div>
       <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
     </div>
-      <section class="card authrow" id="authx"></section>
-      <section class="card panel rogue strip">
-        <div class="striphd">
-          <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
-          <span class="sub" style="margin:0">Forges a request to the insurer's public A2A endpoint.</span>
-          <span class="grow"></span>
-          <button class="btn danger" data-attack="impersonate" title="Uses Riverside's agent ID, signs with its own key">Impersonate Riverside</button>
-          <button class="btn ghost-danger" data-attack="unregistered" title="An agent ID that is not in the NANDA Index">Unregistered agent</button>
-        </div>
-        <div class="attempts" id="attempts"></div>
-        <div class="empty" id="attemptsEmpty">No attacks yet. Try one: both are stopped at the identity check.</div>
-      </section>
+      <section class="card txlog" id="txlog"></section>
     </main>
 
     <!-- INSURER (right) -->
@@ -563,7 +577,7 @@ function drawIndex(){
   });
 }
 function hitRows(ids){
-  document.querySelectorAll(".idxrow").forEach(r => { if (ids.includes(r.dataset.aid)){ r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 1600 / speed); } });
+  document.querySelectorAll(".idxrow").forEach(r => { if (ids.includes(r.dataset.aid)){ r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 1600 * PACE / speed); } });
 }
 const lookups = [];
 const shortId = (id, n = 20) => id.length > 2 * n + 4 ? id.slice(0, n) + "…" + id.slice(-n) : id;
@@ -607,7 +621,8 @@ async function poll(){
 }
 
 // ------------------------------------------------------------- player
-const wait = ms => new Promise(r => setTimeout(r, ms / speed));
+const PACE = 1.7;   // >1 = slower; the speed buttons still scale on top of this
+const wait = ms => new Promise(r => setTimeout(r, ms * PACE / speed));
 async function player(){
   for(;;){
     if (!queue.length){ await new Promise(r => setTimeout(r, 80)); continue; }
@@ -639,7 +654,11 @@ function drawCounts(){
 }
 const NAMES = {provider:"Provider agent", payer:"Insurer agent", rogue:"Spoofed agent"};
 let lastCardFetch = null;   // most recent Agent Card read by the provider agent
-const signedBy = {};     // envelope id -> "signed" event (who signed, with which key)
+const signedBy = {};
+const signedById = {};
+let lastRogueSigned = null;   // latest "signed" event from the spoofed agent   // envelope id -> "signed" event
+const txlog = [];        // one row per signed A2A message, oldest first
+const a2aState = {};     // case -> latest A2A task state     // envelope id -> "signed" event (who signed, with which key)
 const verifs = [];       // "verified" events, newest first
 const shortFp = fp => fp ? fp.split(":").slice(0, 2).join(":") : "";
 const signerNode = ev => ev.sender === boot.identity.payer ? "payer"
@@ -672,7 +691,7 @@ function movePacket(key, color, label, ms){
   path.classList.add("hot");
   if (id === "e_ri") path.setAttribute("opacity", "1");
   return new Promise(res => {
-    const start = performance.now(), dur = ms / speed;
+    const start = performance.now(), dur = ms * PACE / speed;
     const step = now => {
       let t = Math.min(1, (now - start) / dur);
       const e = t < .5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
@@ -694,7 +713,7 @@ function floatBadge(node, text, color, ms = 2600){
   g.innerHTML = `<rect x="${x - w/2}" y="${y - 13}" width="${w}" height="22" rx="11" fill="var(--card)" stroke="${color}" stroke-width="1.5"/>
     <text x="${x}" y="${y + 2}" text-anchor="middle" style="font-size:11.5px;font-weight:700" fill="${color}">${esc(text)}</text>`;
   $("#fx").appendChild(g);
-  setTimeout(() => { g.style.opacity = "0"; setTimeout(() => g.remove(), 450); }, ms / speed);
+  setTimeout(() => { g.style.opacity = "0"; setTimeout(() => g.remove(), 450); }, ms * PACE / speed);
 }
 function flash(id){ const n = document.getElementById(id); n.classList.remove("flash"); void n.getBBox(); n.classList.add("flash"); }
 
@@ -760,7 +779,7 @@ async function animate(ev){
       await movePacket("payer>sec", "var(--err)", "alert", 800);
       document.getElementById("h_sec").classList.add("alerted");
       document.getElementById("e_ys").classList.add("hot");
-      setTimeout(() => { document.getElementById("h_sec").classList.remove("alerted"); document.getElementById("e_ys").classList.remove("hot"); }, 3500 / speed);
+      setTimeout(() => { document.getElementById("h_sec").classList.remove("alerted"); document.getElementById("e_ys").classList.remove("hot"); }, 3500 * PACE / speed);
       return wait(500);
     case "outcome": {
       const c = cases[ev.case];
@@ -794,6 +813,11 @@ function apply(ev){
   if (ev.kind === "signed") signedBy[`${ev.env_id}|${ev.digest}`] = ev;
   if (ev.kind === "agent_card" && ev.by === "provider") lastCardFetch = ev;
   if (ev.kind === "verified") verifs.unshift({...ev, signer: signedBy[`${ev.env_id}|${ev.digest}`]});
+  if (ev.kind === "signed") signedById[ev.env_id] = ev;
+  if (ev.kind === "signed" && cases[ev.case] && cases[ev.case].kind === "rogue" && ev.sender !== boot.identity.payer) lastRogueSigned = ev;   // the attacker's own message, not the insurer's reply
+  if (ev.kind === "a2a") a2aState[ev.case] = ev.state;
+  if (ev.kind === "send") txlog.push({seq: ev.seq, ts: ev.ts, case: ev.case, from: ev.from_node, to: ev.to_node, env: ev.env,
+                                      a2a: ev.from_node === "payer" ? `task ${shortState(a2aState[ev.case])}` : "SendMessage"});
   const c = cases[ev.case];
   if (!c) return;
   c.events.push(ev);
@@ -851,21 +875,16 @@ function render(){
 
   renderIdentity();
   renderProvCard();
-  renderAuth();
+  renderTxLog();
 
   // alerts
   $("#alerts").innerHTML = alerts.length ? alerts.slice(0, 5).map(a => `<div class="alert"><b>#${a.caseId}</b> ${esc(a.message)}</div>`).join("") : '<div class="empty">No alerts.</div>';
 
   // rogue attempts
   $("#attemptsEmpty").style.display = rogue.length ? "none" : "";
-  $("#attempts").innerHTML = rogue.map(c => {
-    const v = verifs.find(x => x.case === c.id && x.sender !== boot.identity.payer);
-    const why = v ? (v.published_key ? `signed with key ${shortFp(v.signer && v.signer.fingerprint)} · index has ${shortFp(v.fingerprint)}`
-                                     : `signed with key ${shortFp(v.signer && v.signer.fingerprint)} · not in index`)
-                  : (c.done ? "" : "in flight…");
-    return `<div class="att ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><span class="shield ${c.identity === "bad" ? "bad" : "wait"}">${c.identity === "bad" ? "⛔" : "⏳"}</span>
-      <span class="grow"><b>#${c.id} · ${esc(c.label)}</b><br><span class="t2">${esc(why)}</span></span>${badge(c.status)}</div>`;
-  }).join("");
+  $("#attempts").innerHTML = rogue.map(c => taskCard(c)).join("");
+  // flag the Provider tab when it needs a person and the Spoofed tab is showing
+  $("#provDot").hidden = !(leftTab === "rogue" && Object.values(checkpoints).some(cp => cp.side === "provider"));
 
   // checkpoints
   const cps = Object.values(checkpoints);
@@ -945,48 +964,51 @@ function identityCard(title, agentId, role){
       <span class="mono" style="font-size:10.5px;color:var(--muted)">${esc(me.public_key || "")}</span><br>published in the NANDA Index for anyone to check</span>
     <span class="k">Private key</span><span class="v">🔒 not shown: ${esc(id.key_storage)}. It signs every message ${esc(role)}; whoever holds it can sign as this agent.</span></div>`;
 }
+function rogueCard(){
+  const id = boot.identity, s = lastRogueSigned, alg = id.alg === "ed25519" ? "Ed25519" : id.alg;
+  const c = s ? cases[s.case] : null;
+  const claimed = s ? s.sender : null;
+  const impersonating = claimed === id.provider;
+  const idLine = !s ? `claims <span class="mono">${esc(id.provider)}</span> (impersonating) or <span class="mono">${esc(boot.rogue_id)}</span> (unregistered)`
+    : `<span class="mono">${esc(claimed)}</span><br>${impersonating ? "<b>stolen ID:</b> Riverside's real agent ID" : "<b>made-up ID:</b> not in the NANDA Index"}`;
+  const keyLine = !s ? `${esc(alg)} key generated fresh for each attack; never published`
+    : `${esc(alg)} · fingerprint <span class="fp bad">${esc(s.fingerprint)}</span><br><span class="mono" style="font-size:10px;color:var(--muted)">${esc(s.public_key)}</span><br>
+       ${impersonating ? `≠ Riverside's published key <span class="fp ok">${esc(shortFp(id.fingerprints[id.provider]))}</span>` : "not published in the NANDA Index"}`;
+  return `<div class="hd">🕵️ Spoofed agent${c ? ` · attack #${c.id}` : ""}</div><div class="kv">
+    <span class="k">Agent ID</span><span class="v">${idLine}</span>
+    <span class="k">Public key</span><span class="v">${keyLine}</span>
+    <span class="k">Private key</span><span class="v">🔒 not shown: the attacker's own key, made per attack; it signs, but no one trusts it</span></div>`;
+}
 function renderIdentity(){
   $("#provId").innerHTML = identityCard("Riverside provider agent", boot.identity.provider, "this agent sends");
+  $("#rogueId").innerHTML = rogueCard();
   $("#payId").innerHTML = identityCard("Example Health Plan insurer agent", boot.identity.payer, "and decision this agent sends back");
 }
-function authRow(v, dir){
-  const id = boot.identity;
-  const label = dir === "in"
-    ? `<span style="color:var(--prov)">Provider → Insurer</span><small>insurer verifies</small>`
-    : `<span style="color:var(--payer)">Insurer → Provider</span><small>provider verifies</small>`;
-  if (!v){
-    const why = dir === "out" && cases[selCase] && cases[selCase].kind === "rogue"
-      ? "the spoofed agent never checks replies" : "waiting for a message";
-    return `<div class="arow"><div class="dir">${label}</div>
-      <div class="st"><span class="lb">① signed with key</span><br>private key</div>
-      <div class="st"><span class="lb">② A2A message</span><br>signature inside</div>
-      <div class="st"><span class="lb">③ key in NANDA Index</span><br>public key</div>
-      <div class="st"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>sig vs key</div>
-      <div class="vd na">${esc(why)}</div></div>`;
-  }
-  const s = v.signer || {};
-  const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
-  const k = keyMatch ? "ok" : "bad", ok = v.ok;
-  const claimed = boot.agents.find(a => a.agent_id === v.sender);
-  const verdict = ok ? `✔ genuine: ${claimed ? claimed.organization : "sender"}`
-    : !v.published_key ? "✘ unknown agent"
-    : keyMatch ? "✘ altered in transit" : "✘ forged: wrong key";
-  return `<div class="arow"><div class="dir">${label}</div>
-    <div class="st ${k}" title="claims to be ${esc(v.sender)}&#10;SHA-256 ${esc(s.digest || v.digest)}&#10;signature ${esc(v.signature)}"><span class="lb">① signed with key</span><br><span class="fp ${k}">${esc(shortFp(s.fingerprint) || "?")}</span> <span class="mm">sig ${esc((v.signature || "").slice(0, 8))}…</span></div>
-    <div class="st"><span class="lb">② A2A ${dir === "in" ? "SendMessage" : "task reply"}</span><br><span class="mono">${esc(v.env_id)}</span></div>
-    <div class="st ${v.published_key ? k : "bad"}"><span class="lb">③ key in NANDA Index</span><br>${v.published_key ? `<span class="fp ${k}">${esc(shortFp(v.fingerprint))}</span>` : '<span class="bad-t">no record</span>'}</div>
-    <div class="st ${ok ? "ok" : "bad"}"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>${v.published_key ? `keys ${keyMatch ? "=" : "≠"} · sig ${ok ? "✔" : "✘"}` : "nothing to check"}</div>
-    <div class="vd ${ok ? "ok" : "bad"}">${esc(verdict)}</div></div>`;
-}
-function renderAuth(){
-  const id = boot.identity;
-  const pick = list => list.find(x => x.case === selCase) || (cases[selCase] ? null : list[0]);
-  const vin = pick(verifs.filter(v => v.sender !== id.payer));
-  const vout = pick(verifs.filter(v => v.sender === id.payer));
-  const c = cases[selCase];
-  const which = c ? `task #${c.id}${c.kind === "rogue" ? " · spoofed agent" : ` · ${c.patient}`}` : "latest";
-  $("#authx").innerHTML = `<div class="ahd">🔐 Authentication exchange <small>${esc(which)} · signed, then checked against the key in the NANDA Index (hover for full values)</small></div>
-    ${authRow(vin, "in")}${authRow(vout, "out")}`;
+function renderTxLog(){
+  const vById = {};
+  for (const v of verifs) if (!(v.env_id in vById)) vById[v.env_id] = v;   // newest verification per envelope
+  const SHORT = {provider: "Provider", payer: "Insurer", rogue: "Spoofed"};
+  const rows = txlog.slice(-80).reverse().map(t => {
+    const b = t.env.body || {}, s = signedById[t.env.id] || {}, v = vById[t.env.id];
+    const keyMatch = !!(v && v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
+    const k = !v ? "" : keyMatch ? "ok" : "bad";
+    const verdict = !v ? '<span class="na">not checked</span>'
+      : v.ok ? '<span class="ok-t">✔ genuine</span>'
+      : !v.published_key ? '<span class="bad-t">✘ unknown agent</span>'
+      : keyMatch ? '<span class="bad-t">✘ altered</span>' : '<span class="bad-t">✘ forged</span>';
+    const time = new Date(t.ts * 1000).toLocaleTimeString([], {hour12: false});
+    return `<div class="txr ${t.case === selCase ? "sel" : ""}" data-case="${t.case}" title="envelope ${esc(t.env.id)} · ${esc(b.summary || "")}">
+      <span class="tm">${esc(time)}</span><span class="cs">#${t.case}</span>
+      <span class="rt"><b class="w-${t.from}">${SHORT[t.from]}</b> → <b class="w-${t.to}">${SHORT[t.to]}</b></span>
+      <span class="ms"><span class="mono">${esc(t.env.type)}</span> <span class="a2">${esc(t.a2a)}</span></span>
+      <span>${b.status ? badge(b.status) : '<span class="na">—</span>'}</span>
+      <span>${s.fingerprint ? `🔏 <span class="fp ${k || "n"}">${esc(shortFp(s.fingerprint))}</span>` : '<span class="na">—</span>'}</span>
+      <span>${!v ? '<span class="na">—</span>' : v.published_key ? `🌐 <span class="fp ${k}">${esc(shortFp(v.fingerprint))}</span>` : '<span class="bad-t">no record</span>'}</span>
+      <span>${verdict}</span></div>`;
+  }).join("");
+  $("#txlog").innerHTML = `<div class="txhd">🧾 Transaction log <small>${txlog.length} signed A2A message${txlog.length === 1 ? "" : "s"} · newest first · click a row to select its task</small></div>
+    <div class="txr txcols"><span>time</span><span>task</span><span>from → to</span><span>message · A2A</span><span>decision</span><span>signed with</span><span>index key</span><span>verified</span></div>
+    <div class="txrows">${rows || '<div class="empty" style="padding:6px 2px">No transactions yet. Delegate a task or launch an attack.</div>'}</div>`;
 }
 function cpCard(cp){
   const denial = cp.labels[0] === "DENIAL CONFIRMED";
@@ -1000,6 +1022,17 @@ function cpCard(cp){
 
 
 // ------------------------------------------------------------- actions
+let leftTab = "prov";
+function showTab(t){
+  leftTab = t;
+  $("#tabProv").hidden = t !== "prov"; $("#tabRogue").hidden = t !== "rogue";
+  $("#tabBtnProv").classList.toggle("on", t === "prov"); $("#tabBtnRogue").classList.toggle("on", t === "rogue");
+  $("#leftPanel").classList.toggle("prov", t === "prov"); $("#leftPanel").classList.toggle("rogue", t === "rogue");
+  try { localStorage.setItem("watchtower.leftTab", t); } catch (e) {}
+  if (boot) render();
+}
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+try { const t = localStorage.getItem("watchtower.leftTab"); if (t === "rogue" || t === "prov") showTab(t); } catch (e) {}
 $("#submitBtn").onclick = async () => {
   const b = $("#submitBtn"); b.disabled = true;
   const r = await api("/api/submit", {patient_id: selPatient}).catch(() => ({error: "can't reach the watchtower server"}));
