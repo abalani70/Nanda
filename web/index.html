@@ -569,6 +569,7 @@ let t0 = null;
 // ------------------------------------------------------------- bootstrap
 async function init(){
   boot = await api("/api/bootstrap");
+  loadLogCleared();
   $("#cryptoChip").textContent = boot.crypto;
   $("#a2aChip").textContent = `A2A ${boot.a2a.version} · JSON-RPC`;
   $("#a2aSrv").textContent = `A2A server :${new URL(boot.a2a.endpoint).port || 80}`;
@@ -692,7 +693,11 @@ function logPush(ev){
 }
 let logCleared = 0;      // hide log rows with seq <= this (Clear log)
 let logScope = "all";    // "all" | "task"
-try { logCleared = +localStorage.getItem("watchtower.logCleared") || 0; } catch (e) {}
+// Clear log is remembered per browser, but only for the same server run: event numbers restart when it restarts.
+function loadLogCleared(){
+  try { const v = JSON.parse(localStorage.getItem("watchtower.logCleared") || "null");
+        logCleared = v && v.instance === boot.instance ? +v.seq || 0 : 0; } catch (e) { logCleared = 0; }
+}
 const a2aState = {};     // case -> latest A2A task state     // envelope id -> "signed" event (who signed, with which key)
 const verifs = [];       // "verified" events, newest first
 const shortFp = fp => fp ? fp.split(":").slice(0, 2).join(":") : "";
@@ -1102,7 +1107,7 @@ function renderTxLog(){
   nb.scrollTop = atBottom ? nb.scrollHeight : keepTop;
   $("#logClear").onclick = () => {
     logCleared = Math.max(logCleared, fetched);   // everything received so far, including steps still queued for animation
-    try { localStorage.setItem("watchtower.logCleared", String(logCleared)); } catch (e) {}
+    try { localStorage.setItem("watchtower.logCleared", JSON.stringify({instance: boot.instance, seq: logCleared})); } catch (e) {}
     renderTxLog();
   };
   document.querySelectorAll("[data-scope]").forEach(b => b.onclick = () => { logScope = b.dataset.scope; renderTxLog(); });

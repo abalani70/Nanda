@@ -201,6 +201,7 @@ class WebOversight(Oversight):
 # ------------------------------------------------------------------ app
 class App:
     def __init__(self, live_index: bool, a2a_port: int = 8765):
+        self.instance = f"{time.time():.6f}"   # event seqs restart with each server run
         self.log = EventLog()
         c.subscribe(self.log.on_console)
         self.oversight = WebOversight(self.log)
@@ -318,7 +319,7 @@ class App:
             })
         return {"patients": patients, "agents": self.index.all(), "crypto": CRYPTO_MODE,
                 "index_label": self.index_label, "policy": POLICY, "payer_org": PAYER_ORG,
-                "rogue_id": ROGUE_ID,
+                "rogue_id": ROGUE_ID, "instance": self.instance,
                 "identity": {"alg": CRYPTO_MODE, "key_storage": self.key_storage,
                              "fingerprints": {a["agent_id"]: fingerprint(a["public_key"]) for a in self.index.all()},
                              "provider": self.provider.AGENT_ID, "payer": self.payer.AGENT_ID},
