@@ -98,7 +98,10 @@ def verify(public_key_b64: str, data: bytes, sig_b64: str) -> bool:
 
 def fingerprint(public_key_b64: str) -> str:
     """Short, human-comparable ID for a public key: first 16 hex of its SHA-256."""
-    h = hashlib.sha256(_unb64(public_key_b64)).hexdigest()[:16]
+    try:
+        h = hashlib.sha256(_unb64(public_key_b64)).hexdigest()[:16]
+    except (ValueError, TypeError, AttributeError):
+        return "invalid-key"
     return ":".join(h[i:i + 4] for i in range(0, 16, 4))
 
 

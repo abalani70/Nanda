@@ -757,9 +757,9 @@ function apply(ev){
     if (!firstLoad || selCase === null) selCase = ev.case;
   }
   if (ev.kind === "index") lookups.unshift(ev);
-  if (ev.kind === "signed") signedBy[ev.env_id] = ev;
+  if (ev.kind === "signed") signedBy[`${ev.env_id}|${ev.digest}`] = ev;
   if (ev.kind === "agent_card" && ev.by === "provider") lastCardFetch = ev;
-  if (ev.kind === "verified") verifs.unshift({...ev, signer: signedBy[ev.env_id]});
+  if (ev.kind === "verified") verifs.unshift({...ev, signer: signedBy[`${ev.env_id}|${ev.digest}`]});
   const c = cases[ev.case];
   if (!c) return;
   c.events.push(ev);
@@ -886,13 +886,17 @@ const shorten = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 function renderProvCard(){
   const f = lastCardFetch, card = f ? f.card : boot.a2a.card, iface = f ? f.interface : card.supportedInterfaces[0];
   const skills = (card.skills || []).map(sk => `<span class="tagx">skill: ${esc(sk.id)}</span>`).join("");
+  const payerFacts = boot.agents.find(a => a.agent_id === boot.identity.payer);
+  const urlOk = !!(payerFacts && iface && iface.url === payerFacts.endpoint);
+  const skillOk = (card.skills || []).some(sk => sk.id === "prior-auth.review");
+  const check = (ok, text) => `<span class="chk" style="color:var(--${ok ? "ok" : "err"})">${ok ? "✔" : "✘"} ${esc(text)}</span>`;
   const when = f ? `read at ${new Date(f.ts * 1000).toLocaleTimeString()} for task #${f.case}` : "read before each request";
   $("#provCard").innerHTML = `🪪 <b>A2A Agent Card our agent reads</b> <span style="color:var(--muted)">(${esc(when)})</span><br>
     <a href="${esc(f ? f.url : boot.a2a.card_url)}" target="_blank" rel="noopener">${esc(f ? f.url : boot.a2a.card_url)}</a><br>
     <b>${esc(card.name)}</b> · ${esc(card.provider ? card.provider.organization : "")}
     <span class="tagx">${esc(iface.protocolBinding)} ${esc(iface.protocolVersion)}</span>${skills}
-    <span class="chk">✔ card's JSON-RPC URL matches the endpoint in the NANDA Index</span>
-    <span class="chk">✔ offers prior-auth.review, so our agent sends SendMessage</span>
+    ${check(urlOk, "card's JSON-RPC URL matches the endpoint in the NANDA Index")}
+    ${check(skillOk, skillOk ? "offers prior-auth.review, so our agent sends SendMessage" : "no prior-auth.review skill: our agent won't send")}
     <span style="color:var(--muted);font-size:11px">Our agent is an A2A <b>client</b>: it reads this card, then calls ${esc(iface.url)}.</span>`;
 }
 function renderIdentity(){
@@ -910,7 +914,7 @@ function renderAuth(){
   const foot = `Replies are signed with the insurer's key <span class="fp n">${esc(id.fingerprints[id.payer])}</span> and checked by the provider agent the same way: ${replies.filter(r => r.ok).length}/${replies.length} valid.`;
   if (!v){
     $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange</div>
-      <div class="astep"><span class="n">1</span><div><div class="t">Sender signs</div>SHA-256 of the message, signed with the sender's private key (${esc(alg)}).</div></div>
+      <div class="astep"><span class="n">1</span><div><div class="t">Sender signs</div>The sender signs the message bytes with its private key (${esc(alg)}); the SHA-256 shown is just a fingerprint of the message.</div></div>
       <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A</div>The signature travels inside the A2A message.</div></div>
       <div class="astep"><span class="n">3</span><div><div class="t">Insurer looks up the sender</div>The NANDA Index returns the public key published for that agent ID.</div></div>
       <div class="astep"><span class="n">4</span><div><div class="t">Verify</div>The signature only checks out against the key that made it.</div></div>
@@ -918,21 +922,23 @@ function renderAuth(){
     return;
   }
   const s = v.signer || {}, c = cases[v.case] || {};
-  const match = v.ok, cls = match ? "ok" : "bad";
+  const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
+  const match = v.ok, cls = match ? "ok" : "bad", kcls = keyMatch ? "ok" : "bad";
   const claimed = boot.agents.find(a => a.agent_id === v.sender);
   const verdict = match ? `✔ Signature valid: the message really came from ${claimed ? claimed.organization : v.sender}.`
+    : v.published_key && keyMatch ? "✘ Rejected: right key, but the signature doesn't match the message bytes (altered in transit)."
     : v.published_key ? "✘ Rejected: it was signed with a different key than the one published for this agent ID. Forged."
     : "✘ Rejected: no agent with this ID is published in the NANDA Index.";
   $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange <small>task #${v.case}${c.kind === "rogue" ? " · spoofed agent" : ""} · ${esc(alg)}</small></div>
     <div class="astep ${cls}k"><span class="n">1</span><div><div class="t">Sender signs the message</div>
       claims to be <span class="mono">${esc(shortId(v.sender, 18))}</span><br>
-      signed with key <span class="fp ${cls}">${esc(s.fingerprint || "?")}</span>
-      <div class="m">SHA-256 ${esc((s.digest || v.digest).slice(0, 32))}…<br>sig ${esc((v.signature || "").slice(0, 32))}…</div></div></div>
+      signed with key <span class="fp ${kcls}">${esc(s.fingerprint || "?")}</span>
+      <div class="m">message SHA-256 (fingerprint) ${esc((s.digest || v.digest).slice(0, 32))}…<br>${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} signature over the message bytes ${esc((v.signature || "").slice(0, 28))}…</div></div></div>
     <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A <span class="mono" style="font-weight:400">SendMessage</span></div>envelope ${esc(v.env_id)}</div></div>
     <div class="astep ${v.published_key ? "" : "badd"}"><span class="n">3</span><div><div class="t">Insurer asks the NANDA Index for that agent's key</div>
-      ${v.published_key ? `published key <span class="fp ${cls}">${esc(v.fingerprint)}</span>` : `<span class="bad-t">no record for this agent ID</span>`}</div></div>
-    <div class="astep ${cls}${cls === "ok" ? "k" : "d"}"><span class="n">4</span><div><div class="t">Verify ${esc(id.alg === "ed25519" ? "Ed25519" : "")}(signature, SHA-256, published key)</div>
-      ${v.published_key ? `signer key <span class="fp ${cls}">${esc(shortFp(s.fingerprint))}</span> ${match ? "=" : "≠"} published key <span class="fp ${cls}">${esc(shortFp(v.fingerprint))}</span>` : "nothing to verify against"}</div></div>
+      ${v.published_key ? `published key <span class="fp ${kcls}">${esc(v.fingerprint)}</span>` : `<span class="bad-t">no record for this agent ID</span>`}</div></div>
+    <div class="astep ${cls}${cls === "ok" ? "k" : "d"}"><span class="n">4</span><div><div class="t">Verify ${esc(id.alg === "ed25519" ? "Ed25519" : "")}(signature, message bytes, published key)</div>
+      ${v.published_key ? `signer key <span class="fp ${kcls}">${esc(shortFp(s.fingerprint))}</span> ${keyMatch ? "=" : "≠"} published key <span class="fp ${kcls}">${esc(shortFp(v.fingerprint))}</span><br>signature ${match ? '<span class="ok-t">checks out</span>' : '<span class="bad-t">does not check out</span>'}` : "nothing to verify against"}</div></div>
     <div class="verdict ${cls}">${esc(verdict)}</div>
     <div class="foot">${foot}</div>`;
 }
