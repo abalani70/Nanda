@@ -49,12 +49,10 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
 
 - Provider overseer (left): pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
 - Insurer oversight (right): what the insurer agent received, clinician decisions, security alerts, and a link to its Agent Card.
-- Authentication exchange (under the graph, both directions: provider → insurer and insurer → provider): the real values from the signing and
-  verification code: the claimed agent ID, the fingerprint of the key that signed it, the SHA-256 of the message,
-  the Ed25519 signature, the key the NANDA Index publishes for that ID, and whether they match. A spoof shows
-  a different signer key (forged) or no published key (unknown agent). The provider panel shows the provider
-  agent's own ID and key fingerprint; the graph shows a "signed" badge at the sender and a "verified" badge at
-  the receiver.
+- Transaction log (under the graph): every signed A2A message, newest first: time, task, sender → receiver,
+  message type and A2A operation or task state, decision, the key that signed it, the key the NANDA Index
+  publishes for that agent ID, and whether verification passed (genuine / forged / altered / unknown agent).
+  A spoof shows a different signer key (forged) or no published key. Click a row to select its task.
 - Spoofed agent (strip under the graph): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
 - `/api/trace` (the **trace.json** button) gives every signed envelope and raw A2A JSON-RPC request/response.
 
