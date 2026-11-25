@@ -243,7 +243,7 @@ header .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);co
 .msg{box-shadow:0 2px 8px -6px rgba(16,24,40,.4)}
 h3{font-size:11px}
 @media (prefers-color-scheme: dark){header{background:linear-gradient(120deg,#0b1430 0%,#21184d 55%,#083a33 100%)}}
-.conn{position:sticky;top:0;z-index:10;background:var(--err);color:#fff;text-align:center;font-weight:600;padding:8px 16px}
+.conn{position:fixed;left:0;right:0;top:0;z-index:10;background:var(--err);color:#fff;text-align:center;font-weight:600;padding:8px 16px}
 .wrapup{padding:18px;margin-top:12px}
 .wrapup .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
 .wrapup .col{border-radius:14px;padding:12px 14px;background:var(--soft)}
@@ -258,8 +258,8 @@ header{flex:none;margin:0;padding:10px 18px;border-radius:16px;flex-wrap:nowrap}
 @media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px} .striphd .sub{display:none}}
 h1{font-size:20px}
 h1 small{font-size:12.5px}
-.stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,1fr) minmax(0,2.4fr) minmax(300px,1fr);gap:12px}
-.side{overflow-y:auto;min-height:0;padding:14px}
+.stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,1fr) minmax(560px,2.4fr) minmax(260px,1fr);gap:12px}
+.panel.side{overflow-y:auto;overflow-x:hidden;min-height:0;padding:14px}  /* beats .panel.prov/.panel.payer overflow:hidden */
 .center{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow-y:auto}
 .center .stats{margin:0;flex:none;gap:8px}
 .center .stat{padding:8px 12px}
@@ -292,10 +292,11 @@ h1 small{font-size:12.5px}
 .side .stp .ic{width:24px;height:24px;font-size:12px}
 .side .stp::before{top:11px}
 .side .a2acard{font-size:12px;margin-top:12px}
-@media (max-width:1100px){
+@media (max-width:1200px){
   .wrap{height:auto}
+  header{flex-wrap:wrap}
   .stage{grid-template-columns:1fr}
-  .side,.center{overflow:visible}
+  .panel.side,.center{overflow:visible}
   .graph svg{max-height:none;min-height:0}
 }
 </style>
