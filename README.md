@@ -49,11 +49,19 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
 
 - Provider overseer (left): pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
 - Insurer oversight (right): what the insurer agent received, clinician decisions, security alerts, and a link to its Agent Card.
-- Transaction log (under the graph): every signed A2A message, newest first: time, task, sender → receiver,
-  message type and A2A operation or task state, decision, the key that signed it, the key the NANDA Index
-  publishes for that agent ID, and whether verification passed (genuine / forged / altered / unknown agent).
-  A spoof shows a different signer key (forged) or no published key. Click a row to select its task.
+- Transaction log (under the graph): the full transaction, step by step, oldest first: task delegated, NANDA Index
+  discovery (AgentFacts returned: agent ID, endpoint, key), A2A Agent Card read, message signed (envelope, key),
+  A2A SendMessage / task reply, the receiver's key lookup in the index, signature verification (genuine / forged /
+  altered / unknown agent), people's checkpoints and decisions, security alerts, task closed. Switch between
+  **All tasks** and **Selected task**; **Clear log** empties it without resetting the demo (remembered per browser).
+  Every row shows where it flows (**from → to**, or **⇄** for a request and its reply: index lookups, Agent Card,
+  EMR chart reads). Signing happens locally; verification is checked against the key published in the NANDA Index.
+  Rows are added the moment their animation starts, and the row that is animating is highlighted (◀ now), so the
+  graph and the log always show the same step.
 - Spoofed agent (second tab on the left, next to Provider overseer): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected. The tab shows the attacker's agent ID and the public key it actually signed with, and every attempt. While you are on it, the Provider tab flags any approval waiting for you.
+- **NANDA Index** button (header): every agent registered in the index with its full record (agent ID, organization,
+  role, capabilities, A2A endpoint, Ed25519 public key and fingerprint, issue date), fetched fresh on open; notes that
+  the spoofed agent is not registered.
 - `/api/trace` (the **trace.json** button) gives every signed envelope and raw A2A JSON-RPC request/response.
 
 ## Scenarios
