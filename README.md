@@ -55,6 +55,9 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
   altered / unknown agent), people's checkpoints and decisions, security alerts, task closed. Switch between
   **All tasks** and **Selected task**; **Clear log** empties it without resetting the demo (remembered per browser).
 - Spoofed agent (second tab on the left, next to Provider overseer): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected. The tab shows the attacker's agent ID and the public key it actually signed with, and every attempt. While you are on it, the Provider tab flags any approval waiting for you.
+- **NANDA Index** button (header): every agent registered in the index with its full record (agent ID, organization,
+  role, capabilities, A2A endpoint, Ed25519 public key and fingerprint, issue date), fetched fresh on open; notes that
+  the spoofed agent is not registered.
 - `/api/trace` (the **trace.json** button) gives every signed envelope and raw A2A JSON-RPC request/response.
 
 ## Scenarios
