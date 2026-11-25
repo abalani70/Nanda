@@ -57,10 +57,10 @@ class ProviderAgent:
     def _send(self, env, payer):
         c.send(env, "Provider agent", "Payer agent")
         reply = self.transport(env, payer["endpoint"])
+        c.send(reply, "Payer agent", "Provider agent")   # arrives first, then gets verified
         valid, why = check_envelope(reply, payer)
         if not valid:
             raise RuntimeError(f"payer reply failed verification: {why}")
-        c.send(reply, "Payer agent", "Provider agent")
         return reply
 
     def request_prior_auth(self, patient_id: str, payer_org: str) -> dict:

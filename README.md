@@ -54,6 +54,10 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
   A2A SendMessage / task reply, the receiver's key lookup in the index, signature verification (genuine / forged /
   altered / unknown agent), people's checkpoints and decisions, security alerts, task closed. Switch between
   **All tasks** and **Selected task**; **Clear log** empties it without resetting the demo (remembered per browser).
+  Every row shows where it flows (**from → to**, or **⇄** for a request and its reply: index lookups, Agent Card,
+  EMR chart reads). Signing happens locally; verification is checked against the key published in the NANDA Index.
+  Rows are added the moment their animation starts, and the row that is animating is highlighted (◀ now), so the
+  graph and the log always show the same step.
 - Spoofed agent (second tab on the left, next to Provider overseer): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected. The tab shows the attacker's agent ID and the public key it actually signed with, and every attempt. While you are on it, the Provider tab flags any approval waiting for you.
 - **NANDA Index** button (header): every agent registered in the index with its full record (agent ID, organization,
   role, capabilities, A2A endpoint, Ed25519 public key and fingerprint, issue date), fetched fresh on open; notes that

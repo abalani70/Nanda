@@ -372,6 +372,8 @@ h1 small{font-size:12.5px}
 .irec .k{color:var(--faint)} .irec .v{overflow-wrap:anywhere}
 .irec-hd{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .rogue-rec{border-left-color:var(--rogue);background:var(--rogue-soft)}
+.txr.active{background:var(--human-soft) !important;box-shadow:inset 3px 0 0 var(--human)}
+.txr.active .st::after{content:" ◀ now";color:var(--human);font-weight:700;font-size:10px}
 </style>
 </head>
 <body>
@@ -645,7 +647,9 @@ async function player(){
   for(;;){
     if (!queue.length){ await new Promise(r => setTimeout(r, 80)); continue; }
     const ev = queue.shift();
+    if (isLoggable(ev)){ logPush(ev); activeSeq = ev.seq; renderTxLog(); }   // row appears as its animation starts
     try { await animate(ev); } catch(e){ console.error(e); }
+    activeSeq = null;
     apply(ev); render();
   }
 }
@@ -677,6 +681,15 @@ const signedById = {};
 let lastRogueSigned = null;   // latest "signed" event from the spoofed agent   // envelope id -> "signed" event
 const txlog = [];        // every step of every transaction, oldest first
 const LOG_KINDS = new Set(["case", "index", "agent_card", "signed", "send", "verified", "checkpoint", "decided", "alert", "a2a", "done"]);
+const LOG_STEP = /pulled \d+ document|searched EMR|checking criteria/;   // console steps that also animate
+const loggedSeqs = new Set();
+let activeSeq = null;    // log row whose animation is playing
+const isLoggable = ev => (LOG_KINDS.has(ev.kind) && !(ev.kind === "a2a" && !ev.error)) || (ev.kind === "step" && LOG_STEP.test(ev.text));
+function logPush(ev){
+  if (loggedSeqs.has(ev.seq)) return;
+  loggedSeqs.add(ev.seq);
+  txlog.push({...ev, a2aLabel: ev.kind === "send" ? (ev.from_node === "payer" ? `task ${shortState(a2aState[ev.case])}` : "SendMessage") : null});
+}
 let logCleared = 0;      // hide log rows with seq <= this (Clear log)
 let logScope = "all";    // "all" | "task"
 try { logCleared = +localStorage.getItem("watchtower.logCleared") || 0; } catch (e) {}
@@ -826,8 +839,7 @@ function apply(ev){
   if (ev.kind === "signed") signedById[ev.env_id] = ev;
   if (ev.kind === "signed" && cases[ev.case] && cases[ev.case].kind === "rogue" && ev.sender !== boot.identity.payer) lastRogueSigned = ev;   // the attacker's own message, not the insurer's reply
   if (ev.kind === "a2a") a2aState[ev.case] = ev.state;
-  if (LOG_KINDS.has(ev.kind) && !(ev.kind === "a2a" && !ev.error))
-    txlog.push({...ev, a2aLabel: ev.kind === "send" ? (ev.from_node === "payer" ? `task ${shortState(a2aState[ev.case])}` : "SendMessage") : null});
+  if (isLoggable(ev)) logPush(ev);   // already added at animation start when played live
   const c = cases[ev.case];
   if (!c) return;
   c.events.push(ev);
@@ -997,7 +1009,7 @@ function renderIdentity(){
 const LOG_NAMES = {provider: "Provider", payer: "Insurer", rogue: "Spoofed", index: "Index", emr: "EMR"};
 const shortPerson = w => /clinician/i.test(w) ? "Clinician" : /UM coordinator/i.test(w) ? "UM coord." : /security/i.test(w) ? "Security" : /overseer/i.test(w) ? "Overseer" : w;
 function logRow(e){
-  const id = boot.identity, c = cases[e.case] || {};
+  const id = boot.identity, c = cases[e.case] || e.meta || {};
   const who = n => `<b class="w-${n}">${esc(LOG_NAMES[n] || n)}</b>`;
   const person = w => `<b class="w-human" title="${esc(w)}">${esc(shortPerson(w))}</b>`;
   const fp = (f, cls = "n") => f ? `<span class="fp ${cls}">${esc(shortFp(f))}</span>` : "";
@@ -1024,7 +1036,7 @@ function logRow(e){
         result: '<span class="ok-t">✔ card read</span>'};
     case "signed": {
       const n = agentNode(e.sender);
-      return {from: who(n), to: "", step: "🔏 sign",
+      return {from: who(n), to: '<span class="na">signs locally</span>', step: "🔏 sign",
         detail: `<span class="mono">${esc(e.msg_type)}</span> · envelope <span class="mono">${esc(e.env_id)}</span> · key ${fp(e.fingerprint, n === "rogue" ? "bad" : "n")} · sha256 ${esc(e.digest.slice(0, 10))}…`,
         result: `<span class="na">${esc(e.alg === "ed25519" ? "Ed25519" : e.alg)}</span>`};
     }
@@ -1039,7 +1051,7 @@ function logRow(e){
       const s = signedBy[`${e.env_id}|${e.digest}`] || {};
       const keyMatch = !!(e.published_key && s.fingerprint && s.fingerprint === e.fingerprint);
       const k = keyMatch ? "ok" : "bad";
-      return {from: who(verifier), to: "", step: "✅ verify",
+      return {from: who(verifier), to: `<b class="w-index" title="checked against the public key published in the NANDA Index">${verifier === "payer" ? "Index key" : "Index key (discovery)"}</b>`, step: "✅ verify",
         detail: `envelope <span class="mono">${esc(e.env_id)}</span> · signer key ${fp(s.fingerprint, k)} ${e.published_key ? (keyMatch ? "=" : "≠") + " index key " + fp(e.fingerprint, k) : "· no published key"}`,
         result: e.ok ? '<span class="ok-t">✔ genuine</span>' : !e.published_key ? '<span class="bad-t">✘ unknown agent</span>'
           : keyMatch ? '<span class="bad-t">✘ altered</span>' : '<span class="bad-t">✘ forged</span>'};
@@ -1054,8 +1066,14 @@ function logRow(e){
       return {from: who("payer"), to: person(e.who), step: "🚨 alert", detail: esc(e.message), result: '<span class="bad-t">alerted</span>'};
     case "a2a":
       return {from: who(e.by), to: who("payer"), step: "⚠️ A2A error", detail: esc(`${e.error.code}: ${e.error.message}`), result: '<span class="bad-t">error</span>'};
+    case "step":
+      if (/pulled \d+ document/.test(e.text))
+        return {from: who("provider"), to: who("emr"), rt2: true, step: "📂 read chart", detail: esc(e.text.replace(/^provider: /, "")), result: '<span class="ok-t">✔ minimum necessary</span>'};
+      if (/searched EMR/.test(e.text))
+        return {from: who("provider"), to: who("emr"), rt2: true, step: "📂 search chart", detail: esc(e.text.replace(/^provider: /, "")), result: '<span class="ok-t">✔ found</span>'};
+      return {from: who("payer"), to: '<span class="na">coverage policy</span>', step: "⚖️ policy check", detail: esc(e.text.replace(/^payer: checking criteria — /, "")), result: '<span class="na">checking</span>'};
     case "done":
-      return {from: who(c.kind === "rogue" ? "rogue" : "provider"), to: "", step: "🏁 closed",
+      return {from: who(c.kind === "rogue" ? "rogue" : "provider"), to: person(c.kind === "rogue" ? "Attacker" : "Provider overseer"), step: "🏁 closed",
         detail: `${c.msgs || 0} A2A messages · ${c.touches || 0} human touch${c.touches === 1 ? "" : "es"}`, result: badge(e.status)};
   }
   return null;
@@ -1069,9 +1087,9 @@ function renderTxLog(){
     const r = logRow(e); if (!r) return "";
     const time = new Date(e.ts * 1000).toLocaleTimeString([], {hour12: false});
     const tip = (r.step + ": " + r.detail.replace(/<[^>]+>/g, "")).replace(/"/g, "&quot;");
-    return `<div class="txr ${e.case === selCase ? "sel" : ""}" data-case="${e.case}" title="${tip}">
+    return `<div class="txr ${e.case === selCase ? "sel" : ""} ${e.seq === activeSeq ? "active" : ""}" data-case="${e.case}" data-seq="${e.seq}" title="${tip}">
       <span class="tm">${esc(time)}</span><span class="cs">#${e.case}</span>
-      <span class="rt">${r.from}${r.to ? " → " + r.to : ""}</span><span class="st">${esc(r.step)}</span>
+      <span class="rt">${r.from}${r.to ? (r.rt2 || e.kind === "index" || e.kind === "agent_card" ? " ⇄ " : " → ") + r.to : ""}</span><span class="st">${esc(r.step)}</span>
       <span class="dt">${r.detail}</span><span class="rs">${r.result}</span></div>`;
   }).join("");
   const scopeLabel = logScope === "all" ? "all tasks" : (cases[selCase] ? `task #${selCase}` : "selected task");
