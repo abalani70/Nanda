@@ -49,7 +49,7 @@ Everything is on one screen: **provider overseer** on the left, the animated gra
 
 - Provider overseer (left): pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
 - Insurer oversight (right): what the insurer agent received, clinician decisions, security alerts, and a link to its Agent Card.
-- Authentication exchange (insurer panel): for each incoming message, the real values from the signing and
+- Authentication exchange (under the graph, both directions: provider → insurer and insurer → provider): the real values from the signing and
   verification code: the claimed agent ID, the fingerprint of the key that signed it, the SHA-256 of the message,
   the Ed25519 signature, the key the NANDA Index publishes for that ID, and whether they match. A spoof shows
   a different signer key (forged) or no published key (unknown agent). The provider panel shows the provider

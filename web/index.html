@@ -267,10 +267,11 @@ h1 small{font-size:12.5px}
 .center .stat .l{font-size:11.5px}
 .center .stat::after{width:60px;height:60px;right:-16px;top:-16px}
 .center .graph{margin:0;flex:none;padding:6px 6px 0}
-.graph svg{max-height:calc(100vh - 420px);min-height:240px}
+.graph svg{max-height:calc(100vh - 612px);min-height:240px}
 .legend{padding:2px 12px 6px;gap:10px;font-size:11.5px}
 .ticker{padding:0 10px 10px;min-height:52px}
 .tx{width:200px;padding:5px 8px;font-size:11.5px}
+.center .tx .r2{display:none}
 .strip{flex:none;padding:10px 14px}
 .striphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .striphd h2{margin:0}
@@ -321,6 +322,39 @@ h1 small{font-size:12.5px}
 .verdict{margin-top:6px;border-radius:10px;padding:7px 10px;font-weight:700;font-size:12px}
 .verdict.ok{background:var(--ok-soft);color:var(--ok)} .verdict.bad{background:var(--err-soft);color:var(--err)}
 .authx .foot{font-size:11px;color:var(--muted);margin-top:6px}
+/* ---------- authentication exchange, both directions, under the animation ---------- */
+.authrow{flex:none;padding:8px 12px}
+.authrow .ahd{display:flex;align-items:baseline;gap:10px;font-weight:750;font-size:13px;margin-bottom:4px}
+.authrow .ahd small{font-weight:500;color:var(--muted);font-size:11px}
+.arow{display:grid;grid-template-columns:118px repeat(4,minmax(0,1fr)) 150px;gap:6px;align-items:stretch;padding:4px 0;border-top:1px dashed var(--line)}
+.arow .dir{min-width:0;overflow-wrap:anywhere;font-size:11px;font-weight:700;line-height:1.25;display:flex;flex-direction:column;justify-content:center}
+.arow .dir small{font-weight:500;color:var(--muted)}
+.arow .st{background:var(--soft);border-radius:8px;padding:4px 7px;font-size:11px;line-height:1.3;min-width:0;position:relative;overflow:hidden;overflow-wrap:anywhere}
+.arow .st .lb{font-weight:700;font-size:10.5px;color:var(--muted);overflow-wrap:anywhere}
+.arow .st .mm{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--faint);overflow-wrap:anywhere}
+.arow .st.ok{background:var(--ok-soft)} .arow .st.bad{background:var(--err-soft)}
+.arow .vd{border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;display:flex;align-items:center;line-height:1.25}
+.arow .vd.ok{background:var(--ok-soft);color:var(--ok)} .arow .vd.bad{background:var(--err-soft);color:var(--err)} .arow .vd.na{background:var(--soft);color:var(--muted);font-weight:500}
+.arow .fp{font-size:10.5px}
+@media (max-width:1500px){.arow{grid-template-columns:96px repeat(4,minmax(0,1fr)) 120px}}
+.center .stat{padding:7px 12px;display:flex;align-items:baseline;gap:8px}
+.center .stat .v{font-size:20px}
+.center .stat .l{font-size:12px}
+.center .stat::after{display:none}
+.submit-row.top{margin:0 0 10px}
+.submit-err{margin:-4px 0 10px;padding:7px 10px;border-radius:10px;background:var(--err-soft);color:var(--err);font-size:12px;font-weight:600}
+.submit-row.top .btn{width:100%;justify-content:center;text-align:center}
+.patients{min-width:0}
+.ptwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0}
+.ptasks{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin:0 0 4px 12px;padding-left:8px;border-left:2px solid var(--prov-soft);min-width:0}
+.ptasks .task{min-width:0;padding:8px 10px}
+.task.nested .nm{font-size:12.5px}
+.task.nested .track{margin-top:6px}
+.side .track{min-width:0}
+.side .track .stp{min-width:0;overflow-wrap:anywhere;font-size:9px}
+.side .track .stp .ic{width:22px;height:22px;font-size:11px}
+.side .track .stp::before{top:10px}
+.ptasks:empty{display:none}
 </style>
 </head>
 <body>
@@ -348,19 +382,16 @@ h1 small{font-size:12.5px}
     <section class="card panel prov side">
       <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
       <div class="sub">Hand the task to your agent. It pulls the chart, finds the insurer's agent and negotiates with it. You're only asked about decisions that need a person.</div>
+      <div class="submit-row top">
+        <button class="btn primary" id="submitBtn">🤖 Delegate to provider agent</button>
+      </div>
+      <div class="submit-err" id="submitErr" hidden></div>
+      <div id="provCps"></div>
       <div class="patients" id="patients"></div>
       <div class="chart" id="chart"></div>
-      <div class="submit-row">
-        <button class="btn primary" id="submitBtn">🤖 Delegate to provider agent</button>
-        <span class="note" id="submitNote"></span>
-      </div>
-      <div id="provCps"></div>
       <h3>Our agent's identity &amp; the A2A card it reads</h3>
       <div class="idcard" id="provId"></div>
       <div class="a2acard provcard" id="provCard"></div>
-      <h3>Delegated tasks</h3>
-      <div id="myReqs" class="tasks"></div>
-      <div class="empty" id="myReqsEmpty">Nothing delegated yet.</div>
     </section>
 
     <!-- ANIMATION (center) -->
@@ -455,6 +486,7 @@ h1 small{font-size:12.5px}
       </div>
       <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
     </div>
+      <section class="card authrow" id="authx"></section>
       <section class="card panel rogue strip">
         <div class="striphd">
           <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
@@ -473,10 +505,10 @@ h1 small{font-size:12.5px}
       <h2><span class="dot" style="background:var(--payer)"></span>Insurer oversight · Example Health Plan</h2>
       <div class="sub">The insurer's agent checks the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
       <div id="payerCps"></div>
-      <div class="authx" id="authx"></div>
       <h3>What the insurer agent received</h3>
       <div class="inbox" id="inbox"></div>
       <div class="empty" id="inboxEmpty">Nothing received yet.</div>
+      <div class="idcard" id="payId" style="margin-top:12px"></div>
       <h3>Security alerts</h3>
       <div id="alerts"><div class="empty">No alerts.</div></div>
       <div class="a2acard" id="a2aCard"></div>
@@ -537,13 +569,15 @@ const lookups = [];
 const shortId = (id, n = 20) => id.length > 2 * n + 4 ? id.slice(0, n) + "…" + id.slice(-n) : id;
 
 function renderPatients(){
-  $("#patients").innerHTML = boot.patients.map(p => `
+  $("#patients").innerHTML = boot.patients.map(p => `<div class="ptwrap">
     <button class="pt ${p.id===selPatient?"on":""}" data-pid="${p.id}">
       <span class="r"></span>
       <span><span class="n">${esc(p.name)}</span><br>
       <span class="m">${esc(p.member_id)} · ${esc(p.service_request.display)} · <i>${esc(p.hint)}</i></span></span>
-    </button>`).join("");
+    </button>
+    <div class="ptasks" data-ptasks="${p.id}"></div></div>`).join("");
   const p = boot.patients.find(x => x.id === selPatient);
+  $("#submitBtn").textContent = `🤖 Delegate ${p.name.replace(/ \(synthetic\)$/, "")} to provider agent`;
   $("#chart").innerHTML = `
     <div class="row"><span class="k">Service</span><span>${esc(p.service_request.display)} <span class="mono">CPT ${esc(p.service_request.code)}</span></span></div>
     <div class="row"><span class="k">Diagnosis</span><span>${p.conditions.map(c => `${esc(c.display)} <span class="mono">${esc(c.code)}</span>`).join(", ")}</span></div>
@@ -552,7 +586,7 @@ function renderPatients(){
       <div class="doc"><span class="t">${esc(d.type)}<br>${esc(d.date)}</span><span style="flex:1">${esc(d.text)}</span>
       ${d.withheld ? '<span class="tag" title="Not sent up front (minimum necessary). Released only if the insurer asks and staff approve.">held back</span>' : ""}</div>`).join("")}
     </div>`;
-  document.querySelectorAll(".pt").forEach(b => b.onclick = () => { selPatient = b.dataset.pid; renderPatients(); });
+  document.querySelectorAll(".pt").forEach(b => b.onclick = () => { selPatient = b.dataset.pid; renderPatients(); render(); });
 }
 
 // ------------------------------------------------------------- polling
@@ -801,8 +835,9 @@ function render(){
   $("#stSpoof").textContent = rogue.filter(c => c.status === "REJECTED").length;
 
   // provider requests
-  $("#myReqsEmpty").style.display = prov.length ? "none" : "";
-  $("#myReqs").innerHTML = prov.map(taskCard).join("");
+  document.querySelectorAll("[data-ptasks]").forEach(el => {
+    el.innerHTML = prov.filter(c => c.patient_id === el.dataset.ptasks).map(c => taskCard(c, true)).join("");
+  });
 
   // payer inbox (everything that reached the insurer)
   $("#inboxEmpty").style.display = all.length ? "none" : "";
@@ -869,7 +904,7 @@ function steps(c){
   out.push([c.status === "APPROVED" ? "✅" : c.status === "DENIED" ? "❌" : "🏁", decided ? c.status.toLowerCase() : "decision", decided ? (c.status === "APPROVED" ? true : "fail") : false]);
   return out;
 }
-function taskCard(c){
+function taskCard(c, nested = false){
   const col = c.kind === "rogue" ? "var(--rogue)" : statusColor(c.status) === "var(--prov)" ? "var(--prov)" : statusColor(c.status);
   const track = steps(c).map(([ic, lb, st]) => `<div class="stp ${st === true ? "done" : st || ""}" style="--c:${col}"><span class="ic">${ic}</span>${esc(lb)}</div>`).join("");
   const initials = c.kind === "rogue" ? "🕵️" : esc(c.patient.split(" ").slice(0, 2).map(w => w[0]).join(""));
@@ -877,8 +912,10 @@ function taskCard(c){
   if (c.result && c.result.auth_number) res = `Auth <b class="mono">${esc(c.result.auth_number)}</b> · ${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
   else if (c.status === "AWAITING HUMAN") res = `<span style="color:var(--human)">Waiting on ${esc(c.waitingOn)}</span>`;
   else if (c.done) res = esc(shorten(c.summary || "", 90));
-  return `<div class="task ${c.kind} ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><div class="top"><span class="av">${initials}</span>
-    <div class="grow"><div class="nm">#${c.id} · ${esc(c.kind === "rogue" ? c.label : c.patient)}</div><div class="sv">${esc(c.service)}</div></div>${badge(c.status)}</div>
+  const head = nested
+    ? `<div class="grow"><div class="nm">Request #${c.id}</div></div>${badge(c.status)}`
+    : `<span class="av">${initials}</span><div class="grow"><div class="nm">#${c.id} · ${esc(c.kind === "rogue" ? c.label : c.patient)}</div><div class="sv">${esc(c.service)}</div></div>${badge(c.status)}`;
+  return `<div class="task ${c.kind} ${nested ? "nested" : ""} ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><div class="top">${head}</div>
     <div class="track">${track}</div>${res ? `<div class="res">${res}</div>` : ""}</div>`;
 }
 const shorten = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
@@ -899,48 +936,57 @@ function renderProvCard(){
     ${check(skillOk, skillOk ? "offers prior-auth.review, so our agent sends SendMessage" : "no prior-auth.review skill: our agent won't send")}
     <span style="color:var(--muted);font-size:11px">Our agent is an A2A <b>client</b>: it reads this card, then calls ${esc(iface.url)}.</span>`;
 }
+function identityCard(title, agentId, role){
+  const id = boot.identity, me = boot.agents.find(a => a.agent_id === agentId) || {};
+  const alg = id.alg === "ed25519" ? "Ed25519" : id.alg;
+  return `<div class="hd">🔐 ${esc(title)}</div><div class="kv">
+    <span class="k">Agent ID</span><span class="v mono">${esc(agentId)}</span>
+    <span class="k">Public key</span><span class="v">${esc(alg)} · fingerprint <span class="fp n">${esc(id.fingerprints[agentId] || "?")}</span><br>
+      <span class="mono" style="font-size:10.5px;color:var(--muted)">${esc(me.public_key || "")}</span><br>published in the NANDA Index for anyone to check</span>
+    <span class="k">Private key</span><span class="v">🔒 not shown: ${esc(id.key_storage)}. It signs every message ${esc(role)}; whoever holds it can sign as this agent.</span></div>`;
+}
 function renderIdentity(){
-  const id = boot.identity, me = boot.agents.find(a => a.agent_id === id.provider);
-  $("#provId").innerHTML = `<div class="hd">🔐 Riverside provider agent</div><div class="kv">
-    <span class="k">Agent ID</span><span class="v mono">${esc(id.provider)}</span>
-    <span class="k">Public key</span><span class="v">${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} <span class="fp n" title="${esc(me ? me.public_key : "")}">${esc(id.fingerprints[id.provider])}</span> · published in the NANDA Index</span>
-    <span class="k">Private key</span><span class="v">${esc(id.key_storage)}; signs every message</span></div>`;
+  $("#provId").innerHTML = identityCard("Riverside provider agent", boot.identity.provider, "this agent sends");
+  $("#payId").innerHTML = identityCard("Example Health Plan insurer agent", boot.identity.payer, "and decision this agent sends back");
+}
+function authRow(v, dir){
+  const id = boot.identity;
+  const label = dir === "in"
+    ? `<span style="color:var(--prov)">Provider → Insurer</span><small>insurer verifies</small>`
+    : `<span style="color:var(--payer)">Insurer → Provider</span><small>provider verifies</small>`;
+  if (!v){
+    const why = dir === "out" && cases[selCase] && cases[selCase].kind === "rogue"
+      ? "the spoofed agent never checks replies" : "waiting for a message";
+    return `<div class="arow"><div class="dir">${label}</div>
+      <div class="st"><span class="lb">① signed with key</span><br>private key</div>
+      <div class="st"><span class="lb">② A2A message</span><br>signature inside</div>
+      <div class="st"><span class="lb">③ key in NANDA Index</span><br>public key</div>
+      <div class="st"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>sig vs key</div>
+      <div class="vd na">${esc(why)}</div></div>`;
+  }
+  const s = v.signer || {};
+  const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
+  const k = keyMatch ? "ok" : "bad", ok = v.ok;
+  const claimed = boot.agents.find(a => a.agent_id === v.sender);
+  const verdict = ok ? `✔ genuine: ${claimed ? claimed.organization : "sender"}`
+    : !v.published_key ? "✘ unknown agent"
+    : keyMatch ? "✘ altered in transit" : "✘ forged: wrong key";
+  return `<div class="arow"><div class="dir">${label}</div>
+    <div class="st ${k}" title="claims to be ${esc(v.sender)}&#10;SHA-256 ${esc(s.digest || v.digest)}&#10;signature ${esc(v.signature)}"><span class="lb">① signed with key</span><br><span class="fp ${k}">${esc(shortFp(s.fingerprint) || "?")}</span> <span class="mm">sig ${esc((v.signature || "").slice(0, 8))}…</span></div>
+    <div class="st"><span class="lb">② A2A ${dir === "in" ? "SendMessage" : "task reply"}</span><br><span class="mono">${esc(v.env_id)}</span></div>
+    <div class="st ${v.published_key ? k : "bad"}"><span class="lb">③ key in NANDA Index</span><br>${v.published_key ? `<span class="fp ${k}">${esc(shortFp(v.fingerprint))}</span>` : '<span class="bad-t">no record</span>'}</div>
+    <div class="st ${ok ? "ok" : "bad"}"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>${v.published_key ? `keys ${keyMatch ? "=" : "≠"} · sig ${ok ? "✔" : "✘"}` : "nothing to check"}</div>
+    <div class="vd ${ok ? "ok" : "bad"}">${esc(verdict)}</div></div>`;
 }
 function renderAuth(){
-  const id = boot.identity, alg = id.alg === "ed25519" ? "Ed25519" : `${id.alg} (install cryptography for Ed25519)`;
-  const inbound = verifs.filter(v => v.sender !== id.payer);
-  const v = inbound.find(x => x.case === selCase) || inbound[0];
-  const replies = verifs.filter(x => x.sender === id.payer);
-  const foot = `Replies are signed with the insurer's key <span class="fp n">${esc(id.fingerprints[id.payer])}</span> and checked by the provider agent the same way: ${replies.filter(r => r.ok).length}/${replies.length} valid.`;
-  if (!v){
-    $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange</div>
-      <div class="astep"><span class="n">1</span><div><div class="t">Sender signs</div>The sender signs the message bytes with its private key (${esc(alg)}); the SHA-256 shown is just a fingerprint of the message.</div></div>
-      <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A</div>The signature travels inside the A2A message.</div></div>
-      <div class="astep"><span class="n">3</span><div><div class="t">Insurer looks up the sender</div>The NANDA Index returns the public key published for that agent ID.</div></div>
-      <div class="astep"><span class="n">4</span><div><div class="t">Verify</div>The signature only checks out against the key that made it.</div></div>
-      <div class="foot">Delegate a task or launch an attack to see real values.</div>`;
-    return;
-  }
-  const s = v.signer || {}, c = cases[v.case] || {};
-  const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
-  const match = v.ok, cls = match ? "ok" : "bad", kcls = keyMatch ? "ok" : "bad";
-  const claimed = boot.agents.find(a => a.agent_id === v.sender);
-  const verdict = match ? `✔ Signature valid: the message really came from ${claimed ? claimed.organization : v.sender}.`
-    : v.published_key && keyMatch ? "✘ Rejected: right key, but the signature doesn't match the message bytes (altered in transit)."
-    : v.published_key ? "✘ Rejected: it was signed with a different key than the one published for this agent ID. Forged."
-    : "✘ Rejected: no agent with this ID is published in the NANDA Index.";
-  $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange <small>task #${v.case}${c.kind === "rogue" ? " · spoofed agent" : ""} · ${esc(alg)}</small></div>
-    <div class="astep ${cls}k"><span class="n">1</span><div><div class="t">Sender signs the message</div>
-      claims to be <span class="mono">${esc(shortId(v.sender, 18))}</span><br>
-      signed with key <span class="fp ${kcls}">${esc(s.fingerprint || "?")}</span>
-      <div class="m">message SHA-256 (fingerprint) ${esc((s.digest || v.digest).slice(0, 32))}…<br>${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} signature over the message bytes ${esc((v.signature || "").slice(0, 28))}…</div></div></div>
-    <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A <span class="mono" style="font-weight:400">SendMessage</span></div>envelope ${esc(v.env_id)}</div></div>
-    <div class="astep ${v.published_key ? "" : "badd"}"><span class="n">3</span><div><div class="t">Insurer asks the NANDA Index for that agent's key</div>
-      ${v.published_key ? `published key <span class="fp ${kcls}">${esc(v.fingerprint)}</span>` : `<span class="bad-t">no record for this agent ID</span>`}</div></div>
-    <div class="astep ${cls}${cls === "ok" ? "k" : "d"}"><span class="n">4</span><div><div class="t">Verify ${esc(id.alg === "ed25519" ? "Ed25519" : "")}(signature, message bytes, published key)</div>
-      ${v.published_key ? `signer key <span class="fp ${kcls}">${esc(shortFp(s.fingerprint))}</span> ${keyMatch ? "=" : "≠"} published key <span class="fp ${kcls}">${esc(shortFp(v.fingerprint))}</span><br>signature ${match ? '<span class="ok-t">checks out</span>' : '<span class="bad-t">does not check out</span>'}` : "nothing to verify against"}</div></div>
-    <div class="verdict ${cls}">${esc(verdict)}</div>
-    <div class="foot">${foot}</div>`;
+  const id = boot.identity;
+  const pick = list => list.find(x => x.case === selCase) || (cases[selCase] ? null : list[0]);
+  const vin = pick(verifs.filter(v => v.sender !== id.payer));
+  const vout = pick(verifs.filter(v => v.sender === id.payer));
+  const c = cases[selCase];
+  const which = c ? `task #${c.id}${c.kind === "rogue" ? " · spoofed agent" : ` · ${c.patient}`}` : "latest";
+  $("#authx").innerHTML = `<div class="ahd">🔐 Authentication exchange <small>${esc(which)} · signed, then checked against the key in the NANDA Index (hover for full values)</small></div>
+    ${authRow(vin, "in")}${authRow(vout, "out")}`;
 }
 function cpCard(cp){
   const denial = cp.labels[0] === "DENIAL CONFIRMED";
@@ -956,8 +1002,12 @@ function cpCard(cp){
 // ------------------------------------------------------------- actions
 $("#submitBtn").onclick = async () => {
   const b = $("#submitBtn"); b.disabled = true;
-  const r = await api("/api/submit", {patient_id: selPatient});
-  $("#submitNote").textContent = `Task #${r.id} handed to the provider agent. Watch the agents work.`;
+  const r = await api("/api/submit", {patient_id: selPatient}).catch(() => ({error: "can't reach the watchtower server"}));
+  const err = $("#submitErr");
+  if (r && r.error){
+    err.textContent = `Not delegated: ${r.error}. Try again once a running task finishes.`;
+    err.hidden = false;
+  } else err.hidden = true;
   setTimeout(() => { b.disabled = false; }, 600);
 };
 document.querySelectorAll("[data-attack]").forEach(b => b.onclick = () => api("/api/spoof", {mode: b.dataset.attack}));
