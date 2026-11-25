@@ -30,7 +30,7 @@ from urllib.parse import parse_qs, urlparse
 from pa_demo import a2a
 from pa_demo import console as c
 from pa_demo import emr
-from pa_demo.identity import CRYPTO_MODE, KeyPair
+from pa_demo.identity import CRYPTO_MODE, KeyPair, fingerprint
 from pa_demo.index import MockIndex
 from pa_demo.oversight import Oversight
 from pa_demo.payer_agent import A2A_DESCRIPTION, A2A_SKILLS, POLICY, PayerAgent
@@ -224,6 +224,7 @@ class App:
                                           keys=KeyPair.load_or_create(keys / f"{provider_id['org_id']}.key"))
             run_demo.preflight(inner, [self.payer, self.provider])
             self.index_label = f"NANDA Index ({cfg['base_url']})"
+            self.key_storage = "on this laptop in ~/.pa-demo/keys (never sent anywhere)"
         else:
             inner = MockIndex()
             self.index = WatchedIndex(inner, self.log)
@@ -232,6 +233,7 @@ class App:
             inner.register(self.payer.facts)
             inner.register(self.provider.facts)
             self.index_label = "MockIndex (offline)"
+            self.key_storage = "generated in memory when the server starts (never sent anywhere)"
         self.a2a_server = a2a.A2AServer(self.payer, A2A_SKILLS, A2A_DESCRIPTION,
                                         on_request=self._payer_context)
         self.a2a_httpd = a2a.serve(self.a2a_server, host="127.0.0.1", port=a2a_port)
@@ -317,6 +319,9 @@ class App:
         return {"patients": patients, "agents": self.index.all(), "crypto": CRYPTO_MODE,
                 "index_label": self.index_label, "policy": POLICY, "payer_org": PAYER_ORG,
                 "rogue_id": ROGUE_ID,
+                "identity": {"alg": CRYPTO_MODE, "key_storage": self.key_storage,
+                             "fingerprints": {a["agent_id"]: fingerprint(a["public_key"]) for a in self.index.all()},
+                             "provider": self.provider.AGENT_ID, "payer": self.payer.AGENT_ID},
                 "a2a": {"version": a2a.A2A_VERSION, "endpoint": self.a2a_endpoint,
                         "card_url": a2a.card_url(self.a2a_endpoint), "card": self.a2a_server.card}}
 

@@ -107,3 +107,12 @@ def a2a(method, url, task_id=None, context_id=None, state=None, request=None, re
     tail = (f"error {error.get('code')}: {error.get('message')}" if error
             else f"task {str(task_id)[:8]} {state}")
     print(_c("2", f"    ⇄ A2A {method} {url} → {tail}"))
+
+
+# Cryptographic identity events: observers only (the CLI prints nothing extra).
+def signed(**data):
+    _emit("signed", **data)
+
+
+def verified(**data):
+    _emit("verified", **data)

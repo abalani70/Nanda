@@ -299,6 +299,28 @@ h1 small{font-size:12.5px}
   .panel.side,.center{overflow:visible}
   .graph svg{max-height:none;min-height:0}
 }
+/* ---------- cryptographic identity ---------- */
+.provcard{margin:0 0 10px;font-size:12px}
+.provcard .chk{display:block;color:var(--ok);font-size:11.5px}
+.idcard{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:10px;font-size:11.5px;background:var(--soft)}
+.idcard .hd{font-weight:700;font-size:12px;margin-bottom:4px}
+.idcard .kv{display:grid;grid-template-columns:78px 1fr;gap:2px 8px;align-items:baseline}
+.idcard .k{color:var(--faint)}
+.idcard .v{overflow-wrap:anywhere}
+.fp{font-family:ui-monospace,Menlo,monospace;font-weight:700;padding:0 5px;border-radius:5px;white-space:nowrap}
+.fp.ok{background:var(--ok-soft);color:var(--ok)} .fp.bad{background:var(--err-soft);color:var(--err)} .fp.n{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+.authx{border:1.5px solid var(--payer);border-radius:14px;padding:10px 12px;margin:8px 0 4px;background:var(--card)}
+.authx .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:750;font-size:13px}
+.authx .hd small{font-weight:500;color:var(--muted);font-size:11px}
+.astep{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:7px 0;border-top:1px dashed var(--line);font-size:11.5px}
+.astep:first-of-type{border-top:0}
+.astep .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:11px;background:var(--soft);color:var(--muted)}
+.astep .t{font-weight:700;font-size:12px;margin-bottom:2px}
+.astep .m{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:var(--muted);word-break:break-all}
+.astep.okk .n{background:var(--ok-soft);color:var(--ok)} .astep.badd .n{background:var(--err-soft);color:var(--err)}
+.verdict{margin-top:6px;border-radius:10px;padding:7px 10px;font-weight:700;font-size:12px}
+.verdict.ok{background:var(--ok-soft);color:var(--ok)} .verdict.bad{background:var(--err-soft);color:var(--err)}
+.authx .foot{font-size:11px;color:var(--muted);margin-top:6px}
 </style>
 </head>
 <body>
@@ -333,6 +355,9 @@ h1 small{font-size:12.5px}
         <span class="note" id="submitNote"></span>
       </div>
       <div id="provCps"></div>
+      <h3>Our agent's identity &amp; the A2A card it reads</h3>
+      <div class="idcard" id="provId"></div>
+      <div class="a2acard provcard" id="provCard"></div>
       <h3>Delegated tasks</h3>
       <div id="myReqs" class="tasks"></div>
       <div class="empty" id="myReqsEmpty">Nothing delegated yet.</div>
@@ -448,6 +473,7 @@ h1 small{font-size:12.5px}
       <h2><span class="dot" style="background:var(--payer)"></span>Insurer oversight · Example Health Plan</h2>
       <div class="sub">The insurer's agent checks the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
       <div id="payerCps"></div>
+      <div class="authx" id="authx"></div>
       <h3>What the insurer agent received</h3>
       <div class="inbox" id="inbox"></div>
       <div class="empty" id="inboxEmpty">Nothing received yet.</div>
@@ -501,7 +527,7 @@ function drawIndex(){
     g.insertAdjacentHTML("beforeend", `<g><rect class="idxrow" data-aid="${esc(a.agent_id)}" x="332" y="${y}" width="336" height="26" rx="6" fill="var(--card)" fill-opacity=".85"/>
       <circle cx="345" cy="${y + 13}" r="4" fill="${col}"/>
       <text x="355" y="${y + 11}" style="font-size:10.5px;font-weight:700;fill:var(--ink)">${esc(a.organization)} · ${esc(a.role)} agent</text>
-      <text class="lbl3" x="355" y="${y + 22}">${esc(shortId(a.agent_id, 22))}  🔑 ${esc(a.public_key.slice(0, 10))}…</text></g>`);
+      <text class="lbl3" x="355" y="${y + 22}">${esc(shortId(a.agent_id, 22))}  🔑 ${esc(shortFp(boot.identity.fingerprints[a.agent_id]))}…</text></g>`);
   });
 }
 function hitRows(ids){
@@ -578,6 +604,12 @@ function drawCounts(){
   }
 }
 const NAMES = {provider:"Provider agent", payer:"Insurer agent", rogue:"Spoofed agent"};
+let lastCardFetch = null;   // most recent Agent Card read by the provider agent
+const signedBy = {};     // envelope id -> "signed" event (who signed, with which key)
+const verifs = [];       // "verified" events, newest first
+const shortFp = fp => fp ? fp.split(":").slice(0, 2).join(":") : "";
+const signerNode = ev => ev.sender === boot.identity.payer ? "payer"
+  : (cases[ev.case] && cases[ev.case].kind === "rogue" ? "rogue" : "provider");
 function pushTx(ev){
   const b = ev.env.body || {}, color = ev.env.type === "pa.rejected" ? "var(--err)" : statusColor(b.status);
   const tk = $("#ticker"); const e = tk.querySelector(".empty"); if (e) e.remove();
@@ -659,12 +691,23 @@ async function animate(ev){
       return;
     }
     case "ok":
-      if (ev.node === "payer" && /signature verified/.test(ev.text)){ floatBadge("payer", "✔ identity verified", "var(--ok)"); return wait(600); }
+      if (/signature verified/.test(ev.text)) return wait(120);
       if (ev.node === "provider" && /discovered/.test(ev.text)) return wait(150);
       return wait(200);
     case "bad":
-      if (ev.node === "payer"){ floatBadge("payer", "✘ " + (/not found/.test(ev.text) ? "unknown agent" : "signature mismatch"), "var(--err)", 3400); return wait(800); }
+      if (ev.node === "payer") return wait(150);
       return wait(200);
+    case "signed": {
+      const n = signerNode(ev);
+      floatBadge(n, `🔏 signed · key ${shortFp(ev.fingerprint)}`, n === "payer" ? "var(--payer)" : n === "rogue" ? "var(--rogue)" : "var(--prov)", 1800);
+      return wait(500);
+    }
+    case "verified": {
+      const by = ev.sender === boot.identity.payer ? signerNode({...ev, sender: ""}) : "payer";
+      if (ev.ok) floatBadge(by, `🔑 signature valid · key ${shortFp(ev.fingerprint)}`, "var(--ok)", 2400);
+      else floatBadge(by, ev.published_key ? "✘ signer key ≠ published key" : "✘ no published key", "var(--err)", 3400);
+      return wait(ev.ok ? 650 : 900);
+    }
     case "step":
       if (/searched EMR/.test(ev.text)){ await movePacket("provider>emr", "var(--prov)", "search chart", 600); await movePacket("emr>provider", "var(--prov)", "PT notes", 600); return; }
       if (/pulled \d+ document/.test(ev.text)){ await movePacket("provider>emr", "var(--prov)", "", 450); await movePacket("emr>provider", "var(--prov)", "chart", 450); return; }
@@ -714,6 +757,9 @@ function apply(ev){
     if (!firstLoad || selCase === null) selCase = ev.case;
   }
   if (ev.kind === "index") lookups.unshift(ev);
+  if (ev.kind === "signed") signedBy[`${ev.env_id}|${ev.digest}`] = ev;
+  if (ev.kind === "agent_card" && ev.by === "provider") lastCardFetch = ev;
+  if (ev.kind === "verified") verifs.unshift({...ev, signer: signedBy[`${ev.env_id}|${ev.digest}`]});
   const c = cases[ev.case];
   if (!c) return;
   c.events.push(ev);
@@ -768,13 +814,20 @@ function render(){
       <div class="t2">${esc(from)} · ${sh[2]}</div></div>${badge(c.status)}</div>`;
   }).join("");
 
+  renderIdentity();
+  renderProvCard();
+  renderAuth();
+
   // alerts
   $("#alerts").innerHTML = alerts.length ? alerts.slice(0, 5).map(a => `<div class="alert"><b>#${a.caseId}</b> ${esc(a.message)}</div>`).join("") : '<div class="empty">No alerts.</div>';
 
   // rogue attempts
   $("#attemptsEmpty").style.display = rogue.length ? "none" : "";
   $("#attempts").innerHTML = rogue.map(c => {
-    const why = c.identityWhy ? c.identityWhy.replace(/^sender '.*' /, "") : (c.done ? "" : "in flight…");
+    const v = verifs.find(x => x.case === c.id && x.sender !== boot.identity.payer);
+    const why = v ? (v.published_key ? `signed with key ${shortFp(v.signer && v.signer.fingerprint)} · index has ${shortFp(v.fingerprint)}`
+                                     : `signed with key ${shortFp(v.signer && v.signer.fingerprint)} · not in index`)
+                  : (c.done ? "" : "in flight…");
     return `<div class="att ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><span class="shield ${c.identity === "bad" ? "bad" : "wait"}">${c.identity === "bad" ? "⛔" : "⏳"}</span>
       <span class="grow"><b>#${c.id} · ${esc(c.label)}</b><br><span class="t2">${esc(why)}</span></span>${badge(c.status)}</div>`;
   }).join("");
@@ -830,6 +883,65 @@ function taskCard(c){
 }
 const shorten = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
+function renderProvCard(){
+  const f = lastCardFetch, card = f ? f.card : boot.a2a.card, iface = f ? f.interface : card.supportedInterfaces[0];
+  const skills = (card.skills || []).map(sk => `<span class="tagx">skill: ${esc(sk.id)}</span>`).join("");
+  const payerFacts = boot.agents.find(a => a.agent_id === boot.identity.payer);
+  const urlOk = !!(payerFacts && iface && iface.url === payerFacts.endpoint);
+  const skillOk = (card.skills || []).some(sk => sk.id === "prior-auth.review");
+  const check = (ok, text) => `<span class="chk" style="color:var(--${ok ? "ok" : "err"})">${ok ? "✔" : "✘"} ${esc(text)}</span>`;
+  const when = f ? `read at ${new Date(f.ts * 1000).toLocaleTimeString()} for task #${f.case}` : "read before each request";
+  $("#provCard").innerHTML = `🪪 <b>A2A Agent Card our agent reads</b> <span style="color:var(--muted)">(${esc(when)})</span><br>
+    <a href="${esc(f ? f.url : boot.a2a.card_url)}" target="_blank" rel="noopener">${esc(f ? f.url : boot.a2a.card_url)}</a><br>
+    <b>${esc(card.name)}</b> · ${esc(card.provider ? card.provider.organization : "")}
+    <span class="tagx">${esc(iface.protocolBinding)} ${esc(iface.protocolVersion)}</span>${skills}
+    ${check(urlOk, "card's JSON-RPC URL matches the endpoint in the NANDA Index")}
+    ${check(skillOk, skillOk ? "offers prior-auth.review, so our agent sends SendMessage" : "no prior-auth.review skill: our agent won't send")}
+    <span style="color:var(--muted);font-size:11px">Our agent is an A2A <b>client</b>: it reads this card, then calls ${esc(iface.url)}.</span>`;
+}
+function renderIdentity(){
+  const id = boot.identity, me = boot.agents.find(a => a.agent_id === id.provider);
+  $("#provId").innerHTML = `<div class="hd">🔐 Riverside provider agent</div><div class="kv">
+    <span class="k">Agent ID</span><span class="v mono">${esc(id.provider)}</span>
+    <span class="k">Public key</span><span class="v">${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} <span class="fp n" title="${esc(me ? me.public_key : "")}">${esc(id.fingerprints[id.provider])}</span> · published in the NANDA Index</span>
+    <span class="k">Private key</span><span class="v">${esc(id.key_storage)}; signs every message</span></div>`;
+}
+function renderAuth(){
+  const id = boot.identity, alg = id.alg === "ed25519" ? "Ed25519" : `${id.alg} (install cryptography for Ed25519)`;
+  const inbound = verifs.filter(v => v.sender !== id.payer);
+  const v = inbound.find(x => x.case === selCase) || inbound[0];
+  const replies = verifs.filter(x => x.sender === id.payer);
+  const foot = `Replies are signed with the insurer's key <span class="fp n">${esc(id.fingerprints[id.payer])}</span> and checked by the provider agent the same way: ${replies.filter(r => r.ok).length}/${replies.length} valid.`;
+  if (!v){
+    $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange</div>
+      <div class="astep"><span class="n">1</span><div><div class="t">Sender signs</div>The sender signs the message bytes with its private key (${esc(alg)}); the SHA-256 shown is just a fingerprint of the message.</div></div>
+      <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A</div>The signature travels inside the A2A message.</div></div>
+      <div class="astep"><span class="n">3</span><div><div class="t">Insurer looks up the sender</div>The NANDA Index returns the public key published for that agent ID.</div></div>
+      <div class="astep"><span class="n">4</span><div><div class="t">Verify</div>The signature only checks out against the key that made it.</div></div>
+      <div class="foot">Delegate a task or launch an attack to see real values.</div>`;
+    return;
+  }
+  const s = v.signer || {}, c = cases[v.case] || {};
+  const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
+  const match = v.ok, cls = match ? "ok" : "bad", kcls = keyMatch ? "ok" : "bad";
+  const claimed = boot.agents.find(a => a.agent_id === v.sender);
+  const verdict = match ? `✔ Signature valid: the message really came from ${claimed ? claimed.organization : v.sender}.`
+    : v.published_key && keyMatch ? "✘ Rejected: right key, but the signature doesn't match the message bytes (altered in transit)."
+    : v.published_key ? "✘ Rejected: it was signed with a different key than the one published for this agent ID. Forged."
+    : "✘ Rejected: no agent with this ID is published in the NANDA Index.";
+  $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange <small>task #${v.case}${c.kind === "rogue" ? " · spoofed agent" : ""} · ${esc(alg)}</small></div>
+    <div class="astep ${cls}k"><span class="n">1</span><div><div class="t">Sender signs the message</div>
+      claims to be <span class="mono">${esc(shortId(v.sender, 18))}</span><br>
+      signed with key <span class="fp ${kcls}">${esc(s.fingerprint || "?")}</span>
+      <div class="m">message SHA-256 (fingerprint) ${esc((s.digest || v.digest).slice(0, 32))}…<br>${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} signature over the message bytes ${esc((v.signature || "").slice(0, 28))}…</div></div></div>
+    <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A <span class="mono" style="font-weight:400">SendMessage</span></div>envelope ${esc(v.env_id)}</div></div>
+    <div class="astep ${v.published_key ? "" : "badd"}"><span class="n">3</span><div><div class="t">Insurer asks the NANDA Index for that agent's key</div>
+      ${v.published_key ? `published key <span class="fp ${kcls}">${esc(v.fingerprint)}</span>` : `<span class="bad-t">no record for this agent ID</span>`}</div></div>
+    <div class="astep ${cls}${cls === "ok" ? "k" : "d"}"><span class="n">4</span><div><div class="t">Verify ${esc(id.alg === "ed25519" ? "Ed25519" : "")}(signature, message bytes, published key)</div>
+      ${v.published_key ? `signer key <span class="fp ${kcls}">${esc(shortFp(s.fingerprint))}</span> ${keyMatch ? "=" : "≠"} published key <span class="fp ${kcls}">${esc(shortFp(v.fingerprint))}</span><br>signature ${match ? '<span class="ok-t">checks out</span>' : '<span class="bad-t">does not check out</span>'}` : "nothing to verify against"}</div></div>
+    <div class="verdict ${cls}">${esc(verdict)}</div>
+    <div class="foot">${foot}</div>`;
+}
 function cpCard(cp){
   const denial = cp.labels[0] === "DENIAL CONFIRMED";
   const yes = denial ? "Confirm denial" : "Release documents";
