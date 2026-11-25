@@ -15,6 +15,8 @@ import time
 import uuid
 from pathlib import Path
 
+from . import console
+
 try:
     from cryptography.exceptions import InvalidSignature
     from cryptography.hazmat.primitives import serialization
@@ -94,6 +96,12 @@ def verify(public_key_b64: str, data: bytes, sig_b64: str) -> bool:
         return False
 
 
+def fingerprint(public_key_b64: str) -> str:
+    """Short, human-comparable ID for a public key: first 16 hex of its SHA-256."""
+    h = hashlib.sha256(_unb64(public_key_b64)).hexdigest()[:16]
+    return ":".join(h[i:i + 4] for i in range(0, 16, 4))
+
+
 def make_agentfacts(agent_id: str, name: str, org: str, role: str,
                     capabilities: list[str], endpoint: str, keys: KeyPair) -> dict:
     """An AgentFacts-style record: who the agent is, what it can do, how to reach it."""
@@ -123,15 +131,27 @@ def seal(sender_id: str, recipient_id: str, msg_type: str, body: dict,
         "ts": time.time(),
         "body": body,
     }
-    env["sig"] = keys.sign(canonical(env))
+    data = canonical(env)
+    env["sig"] = keys.sign(data)
+    console.signed(env_id=env["id"], sender=sender_id, recipient=recipient_id, msg_type=msg_type,
+                   digest=hashlib.sha256(data).hexdigest(), signature=env["sig"],
+                   public_key=keys.public_key, fingerprint=fingerprint(keys.public_key), alg=CRYPTO_MODE)
     return env
 
 
 def check_envelope(env: dict, sender_facts: dict | None) -> tuple[bool, str]:
     """Verify an envelope against the sender's published AgentFacts."""
-    if sender_facts is None:
-        return False, f"sender {env.get('from')!r} not found in index"
     unsigned = {k: v for k, v in env.items() if k != "sig"}
-    if not verify(sender_facts["public_key"], canonical(unsigned), env.get("sig", "")):
-        return False, "signature does not match sender's published key"
-    return True, "signature verified against AgentFacts"
+    data = canonical(unsigned)
+    published = sender_facts["public_key"] if sender_facts else None
+    if published is None:
+        ok, why = False, f"sender {env.get('from')!r} not found in index"
+    elif not verify(published, data, env.get("sig", "")):
+        ok, why = False, "signature does not match sender's published key"
+    else:
+        ok, why = True, "signature verified against AgentFacts"
+    console.verified(env_id=env.get("id"), sender=env.get("from"), digest=hashlib.sha256(data).hexdigest(),
+                     signature=env.get("sig", ""), published_key=published,
+                     fingerprint=fingerprint(published) if published else None,
+                     ok=ok, why=why, alg=CRYPTO_MODE)
+    return ok, why
