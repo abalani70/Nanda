@@ -243,7 +243,7 @@ header .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);co
 .msg{box-shadow:0 2px 8px -6px rgba(16,24,40,.4)}
 h3{font-size:11px}
 @media (prefers-color-scheme: dark){header{background:linear-gradient(120deg,#0b1430 0%,#21184d 55%,#083a33 100%)}}
-.conn{position:sticky;top:0;z-index:10;background:var(--err);color:#fff;text-align:center;font-weight:600;padding:8px 16px}
+.conn{position:fixed;left:0;right:0;top:0;z-index:10;background:var(--err);color:#fff;text-align:center;font-weight:600;padding:8px 16px}
 .wrapup{padding:18px;margin-top:12px}
 .wrapup .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
 .wrapup .col{border-radius:14px;padding:12px 14px;background:var(--soft)}
@@ -251,13 +251,61 @@ h3{font-size:11px}
 .wrapup ul{margin:0;padding-left:18px;font-size:13px}
 .wrapup li{margin:3px 0}
 @media (max-width:900px){.wrapup .g3{grid-template-columns:1fr}}
+/* ---------- one-screen layout: provider | animation | insurer ---------- */
+html,body{height:100%}
+.wrap{max-width:none;height:100vh;display:flex;flex-direction:column;gap:10px;padding:12px 14px}
+header{flex:none;margin:0;padding:10px 18px;border-radius:16px;flex-wrap:nowrap}
+@media (max-width:1600px){h1 small{display:none} header .chip{padding:3px 8px} .striphd .sub{display:none}}
+h1{font-size:20px}
+h1 small{font-size:12.5px}
+.stage{flex:1;min-height:0;display:grid;grid-template-columns:minmax(260px,1fr) minmax(560px,2.4fr) minmax(260px,1fr);gap:12px}
+.panel.side{overflow-y:auto;overflow-x:hidden;min-height:0;padding:14px}  /* beats .panel.prov/.panel.payer overflow:hidden */
+.center{display:flex;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow-y:auto}
+.center .stats{margin:0;flex:none;gap:8px}
+.center .stat{padding:8px 12px}
+.center .stat .v{font-size:22px}
+.center .stat .l{font-size:11.5px}
+.center .stat::after{width:60px;height:60px;right:-16px;top:-16px}
+.center .graph{margin:0;flex:none;padding:6px 6px 0}
+.graph svg{max-height:calc(100vh - 420px);min-height:240px}
+.legend{padding:2px 12px 6px;gap:10px;font-size:11.5px}
+.ticker{padding:0 10px 10px;min-height:52px}
+.tx{width:200px;padding:5px 8px;font-size:11.5px}
+.strip{flex:none;padding:10px 14px}
+.striphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.striphd h2{margin:0}
+.striphd .grow{flex:1}
+.strip .btn{padding:7px 12px}
+.attempts{display:flex;gap:8px;overflow-x:auto;margin-top:8px}
+.att{flex:0 0 auto;max-width:420px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-size:12px;cursor:pointer;animation:slidein .4s ease-out}
+.att.sel{border-color:var(--rogue);box-shadow:0 0 0 3px var(--rogue-soft)}
+.att .shield{width:28px;height:28px;font-size:14px;border-radius:8px}
+.att .t2{color:var(--muted)}
+.att .grow{min-width:0}
+.strip .empty{padding:6px 0 0}
+.side .sub{font-size:12px;margin-bottom:10px}
+.side h3{margin:12px 0 6px}
+.side .chart{font-size:12px;padding:8px 10px}
+.side .doc .t{width:82px}
+.side .pt{padding:8px 10px}
+.side .track .stp{font-size:9.5px}
+.side .stp .ic{width:24px;height:24px;font-size:12px}
+.side .stp::before{top:11px}
+.side .a2acard{font-size:12px;margin-top:12px}
+@media (max-width:1200px){
+  .wrap{height:auto}
+  header{flex-wrap:wrap}
+  .stage{grid-template-columns:1fr}
+  .panel.side,.center{overflow:visible}
+  .graph svg{max-height:none;min-height:0}
+}
 </style>
 </head>
 <body>
 <div class="conn" id="conn" hidden>⚠️ Lost connection to the watchtower server. Retrying… (what you see may be out of date)</div>
 <div class="wrap">
   <header>
-    <h1>Prior Auth Watchtower<small>Who watches the swarm? Agents do the routine work; people make the judgment calls.</small></h1>
+    <h1>Prior Auth Watchtower</h1>
     <div class="controls">
       <span class="chip">protocol <b id="a2aChip">A2A</b></span>
       <span class="chip">signatures <b id="cryptoChip">…</b></span>
@@ -273,111 +321,11 @@ h3{font-size:11px}
     </div>
   </header>
 
-  <div class="stats">
-    <div class="card stat"><div class="v" id="stMsgs" style="color:var(--prov)">0</div><div class="l">A2A messages between agents</div></div>
-    <div class="card stat"><div class="v" id="stHuman" style="color:var(--human)">0</div><div class="l">human touches (judgment only)</div></div>
-    <div class="card stat"><div class="v" id="stAuto">0</div><div class="l">requests closed with zero human touches</div></div>
-    <div class="card stat"><div class="v" id="stSpoof">0</div><div class="l">spoofed agents blocked</div></div>
-  </div>
-
-  <div class="card graph">
-    <svg id="g" viewBox="0 0 1000 450" role="img" aria-label="Agent layer: provider agent, insurer agent, NANDA Index and a spoofed agent exchanging signed messages. Human oversight layer below: people who only see judgment calls.">
-      <!-- layers -->
-      <rect x="6" y="6" width="988" height="300" rx="16" fill="var(--soft)" opacity=".6"/>
-      <text class="orgl" x="24" y="30">Agent layer · agents talk to agents</text>
-      <text class="orgl" x="24" y="334">Human oversight layer · judgment calls only</text>
-      <line x1="6" x2="994" y1="318" y2="318" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="6 5"/>
-
-      <!-- edges (paths are used for packet animation) -->
-      <path id="e_pp" class="edge" d="M256,170 L744,170"/>
-      <path id="e_pi" class="edge" d="M170,136 Q186,84 320,84"/>
-      <path id="e_yi" class="edge" d="M830,136 Q814,84 680,84"/>
-      <path id="e_rp" class="edge" d="M596,262 Q770,250 830,204" stroke-dasharray="5 5"/>
-      <path id="e_ri" class="edge" d="M500,228 L500,134" stroke-dasharray="3 6" opacity="0"/>
-      <path id="e_pe" class="edge" d="M110,204 L82,234"/>
-      <path id="e_pu" class="edge ov" d="M170,204 L170,350"/>
-      <path id="e_yc" class="edge ov" d="M800,204 L770,350"/>
-      <path id="e_ys" class="edge ov" d="M866,204 L904,350"/>
-      <text class="lbl3" x="500" y="190" text-anchor="middle">A2A v1.0 · JSON-RPC SendMessage over HTTP · no human in this path</text>
-
-      <!-- NANDA Index -->
-      <g id="n_index" style="color:var(--index)">
-        <rect class="n-box" x="320" y="16" width="360" height="118" rx="14" fill="var(--index-soft)" stroke="var(--index)" stroke-width="2.5"/>
-        <text class="lbl" x="500" y="38" text-anchor="middle" style="fill:var(--index)">🌐 NANDA Index · the DNS for agents</text>
-        <text class="lbl2" x="500" y="53" text-anchor="middle">agent ID → endpoint · capabilities · public key</text>
-        <g id="idxRows"></g>
-      </g>
-      <!-- Provider agent -->
-      <g id="n_provider" style="color:var(--prov)">
-        <rect class="n-box" x="84" y="136" width="172" height="68" rx="12" fill="var(--prov-soft)" stroke="var(--prov)"/>
-        <text class="lbl" x="170" y="164" text-anchor="middle">🤖 Provider agent</text>
-        <text class="lbl2" x="170" y="182" text-anchor="middle">Riverside Health System</text>
-        <text class="lbl3" x="170" y="198" text-anchor="middle">A2A client</text>
-      </g>
-      <!-- Payer agent -->
-      <g id="n_payer" style="color:var(--payer)">
-        <rect class="n-box" x="744" y="136" width="172" height="68" rx="12" fill="var(--payer-soft)" stroke="var(--payer)"/>
-        <text class="lbl" x="830" y="164" text-anchor="middle">🤖 Insurer agent</text>
-        <text class="lbl2" x="830" y="182" text-anchor="middle">Example Health Plan</text>
-        <text class="lbl3" id="a2aSrv" x="830" y="198" text-anchor="middle">A2A server</text>
-      </g>
-      <!-- Rogue agent -->
-      <g id="n_rogue" style="color:var(--rogue)">
-        <rect class="n-box" x="404" y="228" width="192" height="64" rx="12" fill="var(--rogue-soft)" stroke="var(--rogue)" stroke-dasharray="6 4"/>
-        <text class="lbl" x="500" y="256" text-anchor="middle">🤖 Spoofed agent</text>
-        <text class="lbl2" x="500" y="274" text-anchor="middle">claims to be Riverside</text>
-      </g>
-      <!-- EMR (a tool the provider agent uses) -->
-      <g id="n_emr">
-        <path d="M40,234 h64 v40 h-64z" fill="var(--card)" stroke="var(--faint)" stroke-width="1.5"/>
-        <path d="M40,246 h64 M40,258 h64" stroke="var(--line)" stroke-width="1.5"/>
-        <text class="lbl2" x="72" y="268" text-anchor="middle" style="font-weight:700;fill:var(--ink)">EMR</text>
-      </g>
-      <!-- Humans -->
-      <g id="h_um" class="human-n" transform="translate(170,350)">
-        <circle class="ring" cx="0" cy="22" r="26"/>
-        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
-        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Provider overseer</text>
-        <text class="lbl2" x="0" y="76" text-anchor="middle">delegates · approves PHI release</text>
-      </g>
-      <g id="h_md" class="human-n" transform="translate(770,350)">
-        <circle class="ring" cx="0" cy="22" r="26"/>
-        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
-        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Clinician (MD)</text>
-        <text class="lbl2" x="0" y="76" text-anchor="middle">decides any denial</text>
-      </g>
-      <g id="h_sec" class="human-n" transform="translate(904,350)">
-        <circle class="ring" cx="0" cy="22" r="26"/>
-        <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
-        <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Security analyst</text>
-        <text class="lbl2" x="0" y="76" text-anchor="middle">identity alerts</text>
-      </g>
-      <g id="fx"></g>
-    </svg>
-    <div class="legend">
-      <span><i style="background:var(--prov)"></i>request / more info</span>
-      <span><i style="background:var(--ok)"></i>approved</span>
-      <span><i style="background:var(--warn)"></i>pended (send more info)</span>
-      <span><i style="background:var(--err)"></i>denied / rejected</span>
-      <span><i style="background:var(--index)"></i>index lookup</span>
-      <span><i style="background:var(--human)"></i>human oversight</span>
-    </div>
-    <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
-  </div>
-
-  <section class="card panel idx" style="margin-bottom:12px;border-top:3px solid var(--index)">
-    <h2><span class="dot" style="background:var(--index)"></span>🌐 NANDA Index · DNS for agents</h2>
-    <div class="sub">Like DNS maps a name to an address, the index maps an agent ID to its endpoint, skills and public key. Anyone can read it, but only the real agent can sign with the listed key.</div>
-    <div class="recs" id="idxRecs"></div>
-    <div class="a2acard" id="a2aCard"></div>
-    <div class="pills" id="idxLog"></div>
-  </section>
-
-  <div class="cols">
-    <!-- PROVIDER -->
-    <section class="card panel prov">
+  <div class="stage">
+    <!-- PROVIDER (left) -->
+    <section class="card panel prov side">
       <h2><span class="dot" style="background:var(--prov)"></span>Provider overseer · Riverside Health</h2>
-      <div class="sub">No forms, no phone calls. Hand the task to your agent: it pulls the chart, finds the insurer's agent, and negotiates with it. You are only pulled in for decisions that need a person.</div>
+      <div class="sub">Hand the task to your agent. It pulls the chart, finds the insurer's agent and negotiates with it. You're only asked about decisions that need a person.</div>
       <div class="patients" id="patients"></div>
       <div class="chart" id="chart"></div>
       <div class="submit-row">
@@ -385,61 +333,130 @@ h3{font-size:11px}
         <span class="note" id="submitNote"></span>
       </div>
       <div id="provCps"></div>
-      <h3>Delegated tasks (status from the agents)</h3>
+      <h3>Delegated tasks</h3>
       <div id="myReqs" class="tasks"></div>
       <div class="empty" id="myReqsEmpty">Nothing delegated yet.</div>
     </section>
 
-    <!-- PAYER -->
-    <section class="card panel payer">
+    <!-- ANIMATION (center) -->
+    <main class="center">
+    <div class="stats">
+      <div class="card stat"><div class="v" id="stMsgs" style="color:var(--prov)">0</div><div class="l">A2A messages</div></div>
+      <div class="card stat"><div class="v" id="stHuman" style="color:var(--human)">0</div><div class="l">human touches</div></div>
+      <div class="card stat"><div class="v" id="stAuto">0</div><div class="l">closed with no human</div></div>
+      <div class="card stat"><div class="v" id="stSpoof">0</div><div class="l">spoofs blocked</div></div>
+    </div>
+    <div class="card graph">
+      <svg id="g" viewBox="0 0 1000 450" role="img" aria-label="Agent layer: provider agent, insurer agent, NANDA Index and a spoofed agent exchanging signed messages. Human oversight layer below: people who only see judgment calls.">
+        <!-- layers -->
+        <rect x="6" y="6" width="988" height="300" rx="16" fill="var(--soft)" opacity=".6"/>
+        <text class="orgl" x="24" y="30">Agent layer · agents talk to agents</text>
+        <text class="orgl" x="24" y="334">Human oversight layer · judgment calls only</text>
+        <line x1="6" x2="994" y1="318" y2="318" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+        <!-- edges (paths are used for packet animation) -->
+        <path id="e_pp" class="edge" d="M256,170 L744,170"/>
+        <path id="e_pi" class="edge" d="M170,136 Q186,84 320,84"/>
+        <path id="e_yi" class="edge" d="M830,136 Q814,84 680,84"/>
+        <path id="e_rp" class="edge" d="M596,262 Q770,250 830,204" stroke-dasharray="5 5"/>
+        <path id="e_ri" class="edge" d="M500,228 L500,134" stroke-dasharray="3 6" opacity="0"/>
+        <path id="e_pe" class="edge" d="M110,204 L82,234"/>
+        <path id="e_pu" class="edge ov" d="M170,204 L170,350"/>
+        <path id="e_yc" class="edge ov" d="M800,204 L770,350"/>
+        <path id="e_ys" class="edge ov" d="M866,204 L904,350"/>
+        <text class="lbl3" x="500" y="190" text-anchor="middle">A2A v1.0 · JSON-RPC SendMessage over HTTP · no human in this path</text>
+
+        <!-- NANDA Index -->
+        <g id="n_index" style="color:var(--index)">
+          <rect class="n-box" x="320" y="16" width="360" height="118" rx="14" fill="var(--index-soft)" stroke="var(--index)" stroke-width="2.5"/>
+          <text class="lbl" x="500" y="38" text-anchor="middle" style="fill:var(--index)">🌐 NANDA Index · the DNS for agents</text>
+          <text class="lbl2" x="500" y="53" text-anchor="middle">agent ID → endpoint · capabilities · public key</text>
+          <g id="idxRows"></g>
+        </g>
+        <!-- Provider agent -->
+        <g id="n_provider" style="color:var(--prov)">
+          <rect class="n-box" x="84" y="136" width="172" height="68" rx="12" fill="var(--prov-soft)" stroke="var(--prov)"/>
+          <text class="lbl" x="170" y="164" text-anchor="middle">🤖 Provider agent</text>
+          <text class="lbl2" x="170" y="182" text-anchor="middle">Riverside Health System</text>
+          <text class="lbl3" x="170" y="198" text-anchor="middle">A2A client</text>
+        </g>
+        <!-- Payer agent -->
+        <g id="n_payer" style="color:var(--payer)">
+          <rect class="n-box" x="744" y="136" width="172" height="68" rx="12" fill="var(--payer-soft)" stroke="var(--payer)"/>
+          <text class="lbl" x="830" y="164" text-anchor="middle">🤖 Insurer agent</text>
+          <text class="lbl2" x="830" y="182" text-anchor="middle">Example Health Plan</text>
+          <text class="lbl3" id="a2aSrv" x="830" y="198" text-anchor="middle">A2A server</text>
+        </g>
+        <!-- Rogue agent -->
+        <g id="n_rogue" style="color:var(--rogue)">
+          <rect class="n-box" x="404" y="228" width="192" height="64" rx="12" fill="var(--rogue-soft)" stroke="var(--rogue)" stroke-dasharray="6 4"/>
+          <text class="lbl" x="500" y="256" text-anchor="middle">🤖 Spoofed agent</text>
+          <text class="lbl2" x="500" y="274" text-anchor="middle">claims to be Riverside</text>
+        </g>
+        <!-- EMR (a tool the provider agent uses) -->
+        <g id="n_emr">
+          <path d="M40,234 h64 v40 h-64z" fill="var(--card)" stroke="var(--faint)" stroke-width="1.5"/>
+          <path d="M40,246 h64 M40,258 h64" stroke="var(--line)" stroke-width="1.5"/>
+          <text class="lbl2" x="72" y="268" text-anchor="middle" style="font-weight:700;fill:var(--ink)">EMR</text>
+        </g>
+        <!-- Humans -->
+        <g id="h_um" class="human-n" transform="translate(170,350)">
+          <circle class="ring" cx="0" cy="22" r="26"/>
+          <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+          <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Provider overseer</text>
+          <text class="lbl2" x="0" y="76" text-anchor="middle">delegates · approves PHI release</text>
+        </g>
+        <g id="h_md" class="human-n" transform="translate(770,350)">
+          <circle class="ring" cx="0" cy="22" r="26"/>
+          <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+          <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Clinician (MD)</text>
+          <text class="lbl2" x="0" y="76" text-anchor="middle">decides any denial</text>
+        </g>
+        <g id="h_sec" class="human-n" transform="translate(904,350)">
+          <circle class="ring" cx="0" cy="22" r="26"/>
+          <circle cx="0" cy="10" r="9"/><path d="M-16,42 q0,-20 16,-20 q16,0 16,20z"/>
+          <text class="lbl2" x="0" y="62" text-anchor="middle" style="font-weight:700;fill:var(--ink)">Security analyst</text>
+          <text class="lbl2" x="0" y="76" text-anchor="middle">identity alerts</text>
+        </g>
+        <g id="fx"></g>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--prov)"></i>request / more info</span>
+        <span><i style="background:var(--ok)"></i>approved</span>
+        <span><i style="background:var(--warn)"></i>pended (send more info)</span>
+        <span><i style="background:var(--err)"></i>denied / rejected</span>
+        <span><i style="background:var(--index)"></i>index lookup</span>
+        <span><i style="background:var(--human)"></i>human oversight</span>
+      </div>
+      <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
+    </div>
+      <section class="card panel rogue strip">
+        <div class="striphd">
+          <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
+          <span class="sub" style="margin:0">Forges a request to the insurer's public A2A endpoint.</span>
+          <span class="grow"></span>
+          <button class="btn danger" data-attack="impersonate" title="Uses Riverside's agent ID, signs with its own key">Impersonate Riverside</button>
+          <button class="btn ghost-danger" data-attack="unregistered" title="An agent ID that is not in the NANDA Index">Unregistered agent</button>
+        </div>
+        <div class="attempts" id="attempts"></div>
+        <div class="empty" id="attemptsEmpty">No attacks yet. Try one: both are stopped at the identity check.</div>
+      </section>
+    </main>
+
+    <!-- INSURER (right) -->
+    <section class="card panel payer side">
       <h2><span class="dot" style="background:var(--payer)"></span>Insurer oversight · Example Health Plan</h2>
-      <div class="sub">The insurer's agent verifies the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
+      <div class="sub">The insurer's agent checks the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
       <div id="payerCps"></div>
       <h3>What the insurer agent received</h3>
       <div class="inbox" id="inbox"></div>
       <div class="empty" id="inboxEmpty">Nothing received yet.</div>
       <h3>Security alerts</h3>
       <div id="alerts"><div class="empty">No alerts.</div></div>
-      <div class="policy" id="policy" style="margin-top:14px"></div>
-    </section>
-
-    <!-- ROGUE -->
-    <section class="card panel rogue">
-      <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
-      <div class="sub">An attacker finds the insurer's endpoint in the public index and sends a forged request with a fabricated clinical note.</div>
-      <div class="attack">
-        <button class="btn danger" data-attack="impersonate">Impersonate Riverside<small>uses Riverside's agent ID, signs with its own key</small></button>
-        <button class="btn ghost-danger" data-attack="unregistered">Unregistered agent<small>an agent ID that is not in the index</small></button>
-      </div>
-      <h3>Attempts</h3>
-      <div class="inbox" id="attempts"></div>
-      <div class="empty" id="attemptsEmpty">No attacks yet.</div>
+      <div class="a2acard" id="a2aCard"></div>
+      <div class="policy" id="policy" style="margin-top:10px"></div>
     </section>
   </div>
-
-  <section class="card timeline">
-    <div class="hd">
-      <h2 style="margin:0;font-size:15px" id="tlTitle">Agent-to-agent conversation</h2>
-      <span class="chip" id="tlMeta">select a task to replay what the agents said to each other</span>
-    </div>
-    <div id="tl"><div class="empty">Nothing yet.</div></div>
-  </section>
-
-  <section class="card wrapup">
-    <h2 style="margin:0;font-size:16px">Wrap-up</h2>
-    <div class="sub" style="color:var(--muted);font-size:12.5px">Updates live from this session.</div>
-    <div class="g3">
-      <div class="col" style="border-top:3px solid var(--ok)"><h4 style="color:var(--ok)">✅ What worked</h4><ul id="wuWorked"></ul></div>
-      <div class="col" style="border-top:3px solid var(--warn)"><h4 style="color:var(--warn)">⚠️ What didn't (yet)</h4><ul>
-        <li>A2A messages carry FHIR-shaped JSON in a signed envelope, not real Da Vinci PAS bundles</li>
-        <li>A2A runs over loopback HTTP on one laptop; endpoints aren't publicly hosted</li>
-        <li>Coverage policy is a single illustrative rule</li></ul></div>
-      <div class="col" style="border-top:3px solid var(--index)"><h4 style="color:var(--index)">🚀 What's next</h4><ul>
-        <li>Convert requests and decisions to Da Vinci PAS (CMS-0057-F, Jan 2027)</li>
-        <li>Host both agents on public A2A endpoints listed in the NANDA Index</li>
-        <li>Pilot with one real payer and provider pair</li></ul></div>
-    </div>
-  </section>
 </div>
 
 <script>
@@ -486,17 +503,9 @@ function drawIndex(){
       <text x="355" y="${y + 11}" style="font-size:10.5px;font-weight:700;fill:var(--ink)">${esc(a.organization)} · ${esc(a.role)} agent</text>
       <text class="lbl3" x="355" y="${y + 22}">${esc(shortId(a.agent_id, 22))}  🔑 ${esc(a.public_key.slice(0, 10))}…</text></g>`);
   });
-  $("#idxRecs").innerHTML = boot.agents.map(a => {
-    const pay = a.role === "payer";
-    return `<div class="rec" data-aid="${esc(a.agent_id)}"><div class="av" style="background:var(--${pay ? "payer" : "prov"}-soft)">${pay ? "🏦" : "🏥"}</div>
-      <div style="min-width:0"><div class="nm">${esc(a.organization)} · ${pay ? "insurer" : "provider"} agent</div>
-      <div class="mono" style="font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(a.agent_id)}">${esc(a.agent_id)}</div>
-      <div class="ln"><span>⚡ ${esc(a.capabilities[0])}</span><span>📍 ${esc(a.endpoint)}</span><span title="${esc(a.public_key)}">🔑 ${esc(a.public_key.slice(0, 8))}…</span></div></div></div>`;
-  }).join("") + `<div class="rec" style="border-style:dashed;opacity:.8"><div class="av" style="background:var(--rogue-soft)">🕵️</div>
-      <div><div class="nm" style="color:var(--rogue)">Spoofed agent · not registered</div><div class="ln"><span>no record · no trusted key</span></div></div></div>`;
 }
 function hitRows(ids){
-  document.querySelectorAll(".idxrow, .rec[data-aid]").forEach(r => { if (ids.includes(r.dataset.aid)){ r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 1600 / speed); } });
+  document.querySelectorAll(".idxrow").forEach(r => { if (ids.includes(r.dataset.aid)){ r.classList.add("hit"); setTimeout(() => r.classList.remove("hit"), 1600 / speed); } });
 }
 const lookups = [];
 const shortId = (id, n = 20) => id.length > 2 * n + 4 ? id.slice(0, n) + "…" + id.slice(-n) : id;
@@ -759,20 +768,16 @@ function render(){
       <div class="t2">${esc(from)} · ${sh[2]}</div></div>${badge(c.status)}</div>`;
   }).join("");
 
-  // index lookups
-  const who = {provider:"🤖 Provider", payer:"🤖 Insurer", rogue:"🕵️ Spoofed"};
-  $("#idxLog").innerHTML = lookups.slice(0, 8).map(l => {
-    const found = l.op === "find" ? l.result.length > 0 : l.found;
-    const what = l.op === "find" ? `find ${l.query}` : "resolve caller's key";
-    return `<span class="pill ${found ? "" : "miss"}">${esc(who[l.by])} → 🌐 ${esc(what)} ${found ? "✔" : "✘ no record"}</span>`;
-  }).join("") || '<span class="empty">Lookups appear here as agents use the index.</span>';
-
   // alerts
   $("#alerts").innerHTML = alerts.length ? alerts.slice(0, 5).map(a => `<div class="alert"><b>#${a.caseId}</b> ${esc(a.message)}</div>`).join("") : '<div class="empty">No alerts.</div>';
 
   // rogue attempts
   $("#attemptsEmpty").style.display = rogue.length ? "none" : "";
-  $("#attempts").innerHTML = rogue.map(taskCard).join("");
+  $("#attempts").innerHTML = rogue.map(c => {
+    const why = c.identityWhy ? c.identityWhy.replace(/^sender '.*' /, "") : (c.done ? "" : "in flight…");
+    return `<div class="att ${c.id === selCase ? "sel" : ""}" data-case="${c.id}"><span class="shield ${c.identity === "bad" ? "bad" : "wait"}">${c.identity === "bad" ? "⛔" : "⏳"}</span>
+      <span class="grow"><b>#${c.id} · ${esc(c.label)}</b><br><span class="t2">${esc(why)}</span></span>${badge(c.status)}</div>`;
+  }).join("");
 
   // checkpoints
   const cps = Object.values(checkpoints);
@@ -784,22 +789,6 @@ function render(){
   });
 
   document.querySelectorAll("[data-case]").forEach(el => el.onclick = () => { selCase = +el.dataset.case; render(); });
-  renderTimeline();
-  renderWrapup(all, prov, rogue);
-}
-function renderWrapup(all, prov, rogue){
-  const msgs = all.reduce((n, c) => n + c.msgs, 0), touches = all.reduce((n, c) => n + c.touches, 0);
-  const auto = prov.filter(c => c.done && c.touches === 0).length;
-  const blocked = rogue.filter(c => c.status === "REJECTED").length;
-  const items = [
-    `Agents found each other and checked identity through the NANDA Index (${lookups.length} lookup${lookups.length === 1 ? "" : "s"})`,
-    `They talked A2A ${boot.a2a.version}: Agent Card discovery, JSON-RPC SendMessage, and multi-turn tasks (input-required → completed)`,
-    `${msgs} signed agent-to-agent messages, ${touches} human touch${touches === 1 ? "" : "es"}`,
-    prov.length ? `${auto} of ${prov.length} request${prov.length === 1 ? "" : "s"} closed with no person involved` : "Routine requests need no person at all",
-    "People were asked only about denials and releasing more patient data",
-    rogue.length ? `${blocked} of ${rogue.length} spoofed agent${rogue.length === 1 ? "" : "s"} blocked at the identity check` : "Spoofed agents are blocked at the identity check",
-  ];
-  $("#wuWorked").innerHTML = items.map(t => `<li>${esc(t)}</li>`).join("");
 }
 function steps(c){
   const has = (k, f = () => true) => c.events.some(e => e.kind === k && f(e));
@@ -851,76 +840,6 @@ function cpCard(cp){
     <button class="btn" data-decide="${cp.id}" data-yes="0">${no}</button></div></div>`;
 }
 
-function actorOf(ev){
-  if (ev.kind === "send") return ev.from_node;
-  if (ev.kind === "index") return "index";
-  if (["human","checkpoint","decided","alert"].includes(ev.kind)) return "human";
-  if (ev.node) return ev.node;
-  return "system";
-}
-function describe(ev, c){
-  switch (ev.kind){
-    case "case": return c.kind === "rogue" ? `Attack launched: <b>${esc(c.label)}</b>` : `Provider submitted prior auth for <b>${esc(c.patient)}</b> · ${esc(c.service)}`;
-    case "send": {
-      const e = ev.env, b = e.body || {};
-      const arrow = `${esc(ev.from_label)} → ${esc(ev.to_label)}`;
-      const shown = {...e, sig: e.sig ? e.sig.slice(0, 24) + "…" : e.sig};
-      return `<span class="mono">${esc(e.type)}</span> ${b.status ? badge(b.status) : ""} ${arrow}<br>${esc(b.summary || "")}
-        <details><summary>signed envelope ${esc(e.id)} · thread ${esc(e.thread_id)}</summary><pre>${esc(JSON.stringify(shown, null, 2))}</pre></details>`;
-    }
-    case "index":
-      return ev.op === "find" ? `Discovery: <span class="mono">find ${esc(ev.query)}</span> (${esc(ev.org || "any org")}) → ${ev.result.length ? esc(ev.result.map(x => shortId(x)).join(", ")) : "<span class='bad-t'>no match</span>"}`
-        : `Insurer looked up sender's published key: <span class="mono">${esc(shortId(ev.query))}</span> → ${ev.found ? `<span class="ok-t">found (${esc(ev.organization)})</span>` : "<span class='bad-t'>not in index</span>"}`;
-    case "ok": return `<span class="ok-t">✔</span> ${esc(ev.text.replace(/^\w+: /, ""))}`;
-    case "bad": return `<span class="bad-t">✘ ${esc(ev.text.replace(/^\w+: /, ""))}</span>`;
-    case "step": return esc(ev.text.replace(/^\w+: /, ""));
-    case "human": return `<b>Human checkpoint · ${esc(ev.who)}</b><br>${esc(ev.question)}<br><span style="color:var(--muted)">${esc(ev.detail)}</span>`;
-    case "checkpoint": return `Waiting for ${esc(ev.who)}…`;
-    case "decided": return `<b>${esc(ev.who)}:</b> ${esc(ev.word)} <span style="color:var(--muted)">(${esc(ev.how)})</span>`;
-    case "alert": return `<span class="bad-t">🚨 Alert to ${esc(ev.who)}:</span> ${esc(ev.message)}`;
-    case "outcome": return `${badge(ev.status)} ${esc(ev.detail)}`;
-    case "done": return `Case closed · ${c.msgs} signed messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
-    default: return esc(ev.kind);
-  }
-}
-function renderTimeline(){
-  const c = cases[selCase];
-  if (!c){ $("#tl").innerHTML = '<div class="empty">Nothing yet.</div>'; return; }
-  $("#tlTitle").textContent = `Agent-to-agent conversation · task #${c.id} · ${c.kind === "rogue" ? "spoofed agent" : c.patient}`;
-  $("#tlMeta").innerHTML = `${badge(c.status)} &nbsp;${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}`;
-  const start = c.events[0] ? c.events[0].ts : 0;
-  const tm = ev => `+${(ev.ts - start).toFixed(2)}s`;
-  const out = [];
-  for (const ev of c.events){
-    switch (ev.kind){
-      case "case": out.push(`<div class="ovs">${c.kind === "rogue" ? `<b>Attacker</b> launches: ${esc(c.label)}` : `<b>Provider overseer</b> delegated: get prior auth for ${esc(c.patient)} · ${esc(c.service)}`}</div>`); break;
-      case "send": {
-        const e = ev.env, b = e.body || {};
-        const shown = {...e, sig: e.sig ? e.sig.slice(0, 24) + "…" : e.sig};
-        out.push(`<div class="msg ${ev.from_node}"><div class="h"><span>🤖 ${esc(NAMES[ev.from_node])} → ${esc(NAMES[ev.to_node])}</span><span class="mono" style="font-weight:400">${tm(ev)}</span></div>
-          <span class="mono">${esc(e.type)}</span> ${b.status ? badge(b.status) : ""}<div>${esc(b.summary || "")}</div>
-          <details><summary>signed envelope ${esc(e.id)} · thread ${esc(e.thread_id)}</summary><pre>${esc(JSON.stringify(shown, null, 2))}</pre></details></div>`);
-        break;
-      }
-      case "index": out.push(`<div class="sys idx">🔎 ${describe(ev, c)}</div>`); break;
-      case "agent_card": out.push(`<div class="sys a2a">🪪 Read the insurer's A2A Agent Card: <b>${esc(ev.card.name)}</b> · ${esc(ev.interface.protocolBinding)} ${esc(ev.interface.protocolVersion)} · skill ${esc((ev.card.skills || []).map(x => x.id).join(", "))}
-        <details><summary>${esc(ev.url)}</summary><pre style="text-align:left">${esc(JSON.stringify(ev.card, null, 2))}</pre></details></div>`); break;
-      case "a2a": {
-        const trim = o => JSON.parse(JSON.stringify(o, (k, v) => k === "sig" && typeof v === "string" ? v.slice(0, 16) + "…" : v));
-        out.push(`<div class="sys a2a">⇄ A2A <b>${esc(ev.method)}</b> → ${esc(ev.url)} · ${ev.error ? `<span class="bad-t">error ${esc(ev.error.code)}: ${esc(ev.error.message)}</span>` : `task <span class="mono">${esc(String(ev.task_id).slice(0, 8))}</span> · <b>${esc(ev.state)}</b>`}
-          <details><summary>JSON-RPC request and response</summary><pre style="text-align:left">${esc(JSON.stringify({request: {jsonrpc: "2.0", method: ev.method, params: trim(ev.request)}, response: trim(ev.response)}, null, 2))}</pre></details></div>`);
-        break;
-      }
-      case "ok": case "bad": out.push(`<div class="sys">${describe(ev, c)}</div>`); break;
-      case "step": if (/searched EMR|pulled/.test(ev.text)) out.push(`<div class="sys">🗂 ${describe(ev, c)}</div>`); break;
-      case "human": out.push(`<div class="ovs"><b>👤 Oversight · ${esc(ev.who)}</b><br>${esc(ev.question)}</div>`); break;
-      case "decided": out.push(`<div class="ovs"><b>👤 ${esc(ev.who)}:</b> ${esc(ev.word)} <span style="color:var(--muted)">(${esc(ev.how)})</span></div>`); break;
-      case "alert": out.push(`<div class="ovs" style="border-color:var(--err);background:var(--err-soft)"><b style="color:var(--err)">🚨 ${esc(ev.who)}</b> ${esc(ev.message)}</div>`); break;
-      case "done": out.push(`<div class="sys"><b>${badge(c.status)}</b> task closed · ${c.msgs} agent messages · ${c.touches} human touch${c.touches === 1 ? "" : "es"}</div>`); break;
-    }
-  }
-  $("#tl").innerHTML = `<div class="chat">${out.join("")}</div>`;
-}
 
 // ------------------------------------------------------------- actions
 $("#submitBtn").onclick = async () => {
