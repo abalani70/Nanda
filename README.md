@@ -24,6 +24,29 @@ python run_demo.py              # all 4 scenarios, scripted humans
 | `--register` | Publish/update both agents' AgentFacts in the NANDA Index, then exit |
 | `DEMO_PAUSE=0.8` | Env var: slow output down for an audience |
 
+## Web watchtower (graphical demo)
+
+```bash
+python web_app.py            # then open http://127.0.0.1:8080
+python web_app.py --live-index   # discover/verify through api.nandaindex.org instead of MockIndex
+```
+
+The API has no login, so the server only binds to loopback; add `--allow-remote` with
+`--host 0.0.0.0` to show it on another device on a trusted network. If no one answers a
+checkpoint within 15 minutes the task stops with an error: nothing is released or decided
+on a person's behalf.
+
+Same agents, shown live in the browser. The top band is the **agent layer**: the provider agent,
+the insurer agent, the **NANDA Index** (the "DNS for agents") and a **spoofed agent**. Every signed
+message moves across the graph as a packet, and each agent shows how many it sent and received. The
+bottom band is the **human oversight layer**: the provider overseer delegates a task and approves PHI
+release, a clinician decides any proposed denial, and a security analyst gets identity alerts.
+Checkpoints show up as buttons on the page (or switch to "Scripted humans").
+
+- Provider overseer: pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
+- Spoofed agent: **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
+- Agent-to-agent conversation: a chat view of each task, with the full signed envelopes. `/api/trace` gives the JSON.
+
 ## Scenarios
 
 | | Patient | Flow | Human touch |
@@ -94,6 +117,8 @@ Env overrides: `NANDA_INDEX_URL` (e.g. a self-hosted index), `NANDA_DOMAIN`, `NA
 
 ```
 run_demo.py               entry point and scenarios
+web_app.py                web watchtower server (stdlib http.server)
+web/index.html            watchtower page (no external assets; works offline)
 pa_demo/identity.py       keys, AgentFacts, signed envelopes
 pa_demo/nanda_index.py    NANDA Index API client + registration
 pa_demo/index.py          mock NANDA Index (--mock-index)
