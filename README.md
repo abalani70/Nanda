@@ -45,9 +45,12 @@ bottom band is the **human oversight layer**: the provider overseer delegates a 
 release, a clinician decides any proposed denial, and a security analyst gets identity alerts.
 Checkpoints show up as buttons on the page (or switch to "Scripted humans").
 
-- Provider overseer: pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
-- Spoofed agent: **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
-- Agent-to-agent conversation: a chat view of each task, with the signed envelopes and the raw A2A JSON-RPC request/response. `/api/trace` gives the JSON.
+Everything is on one screen: **provider overseer** on the left, the animated graph in the middle, **insurer oversight** on the right.
+
+- Provider overseer (left): pick a synthetic patient, **Delegate to provider agent**, then watch the task's progress track.
+- Insurer oversight (right): what the insurer agent received, clinician decisions, security alerts, and a link to its Agent Card.
+- Spoofed agent (strip under the graph): **Impersonate Riverside** (wrong key) or **Unregistered agent** (not in the index); both are rejected.
+- `/api/trace` (the **trace.json** button) gives every signed envelope and raw A2A JSON-RPC request/response.
 
 ## Scenarios
 
