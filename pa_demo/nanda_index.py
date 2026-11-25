@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -91,11 +92,14 @@ def agent_identity(cfg: dict, role: str) -> dict:
 
 # --------------------------------------------------------------------- client
 class NandaIndexClient:
-    def __init__(self, base_url: str = DEFAULT_BASE_URL, token: str | None = None, timeout: float = 10):
+    def __init__(self, base_url: str = DEFAULT_BASE_URL, token: str | None = None, timeout: float = 10,
+                 cache_ttl: float | None = None):
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout = timeout
+        self.cache_ttl = cache_ttl                 # None: cache for the whole run (CLI)
         self._facts: dict[str, dict | None] = {}   # agent_id -> AgentFacts (per-run cache)
+        self._fetched: dict[str, float] = {}
 
     # ---------------------------------------------------------------- http
     def _call(self, method: str, path: str, body: dict | None = None,
@@ -137,7 +141,8 @@ class NandaIndexClient:
 
     def resolve(self, agent_id: str) -> dict | None:
         """AIR URN -> AgentFacts, or None if the index has no active entry for it."""
-        if agent_id in self._facts:
+        if agent_id in self._facts and (
+                self.cache_ttl is None or time.time() - self._fetched[agent_id] < self.cache_ttl):
             return self._facts[agent_id]
         facts = None
         if agent_id.startswith("urn:air:"):
@@ -150,6 +155,7 @@ class NandaIndexClient:
             if res and res.get("match") == "exact":
                 facts = _facts_from_entry(res.get("entry"), agent_id)
         self._facts[agent_id] = facts
+        self._fetched[agent_id] = time.time()
         return facts
 
     def find(self, capability: str, organization: str | None = None) -> list[dict]:

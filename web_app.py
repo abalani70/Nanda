@@ -43,7 +43,31 @@ HINTS = {
     "pt-1003": "no conservative therapy yet",
 }
 
+MAX_BODY = 64 * 1024        # largest POST body the API accepts
+MAX_RUNNING = 20            # cap on tasks in flight (each holds a thread)
+CHECKPOINT_TIMEOUT = 900    # seconds a checkpoint waits for a person
+INDEX_CACHE_TTL = 60        # live index: re-resolve AgentFacts after this many seconds
+
 _ctx = threading.local()  # which case / actor the current thread is working for
+
+
+class CheckpointTimeout(RuntimeError):
+    """No person answered a checkpoint: stop the task rather than decide for them."""
+
+
+class LocalTransport(Transport):
+    """Only delivers to agents running in this process.
+
+    The watchtower hosts both agents itself, so an endpoint taken from the index that is
+    not one of ours (e.g. an http:// URL in a live-index record) is refused instead of
+    being sent patient data.
+    """
+
+    def __call__(self, env, endpoint):
+        if endpoint not in self.local:
+            raise RuntimeError(f"refusing to send to {endpoint!r}: not an agent hosted by this "
+                               f"watchtower (register the agents without --http)")
+        return super().__call__(env, endpoint)
 
 
 def _node(label: str) -> str:
@@ -58,10 +82,11 @@ class EventLog:
         self.events: list[dict] = []
         self.cases: dict[int, dict] = {}
         self._case_ids = itertools.count(1)
+        self._seq = itertools.count(1)   # never reset, so open tabs keep a valid cursor
 
     def record(self, kind: str, data: dict, case_id=None) -> dict:
         with self.lock:
-            ev = {"seq": len(self.events) + 1, "ts": time.time(),
+            ev = {"seq": next(self._seq), "ts": time.time(),
                   "case": case_id if case_id is not None else getattr(_ctx, "case", None),
                   "kind": kind, **data}
             self.events.append(ev)
@@ -78,8 +103,10 @@ class EventLog:
                     case["human_touches"] += 1
             return ev
 
-    def new_case(self, kind: str, **meta) -> dict:
+    def new_case(self, kind: str, **meta) -> dict | None:
         with self.lock:
+            if sum(1 for cs in self.cases.values() if cs["running"]) >= MAX_RUNNING:
+                return None
             cid = next(self._case_ids)
             case = {"id": cid, "kind": kind, "status": "SUBMITTED", "summary": "",
                     "human_touches": 0, "running": True, "created": time.time(), **meta}
@@ -137,6 +164,7 @@ class WebOversight(Oversight):
         self.auto = False
         self.pending: dict[int, dict] = {}
         self._ids = itertools.count(1)
+        self._lock = threading.Lock()
 
     def ask(self, who, question, detail, key, default, labels=("APPROVED", "REJECTED")):
         question = re.sub(r"\s*Type y to.*$", "", question)
@@ -148,11 +176,17 @@ class WebOversight(Oversight):
                   "detail": detail, "labels": list(labels),
                   "side": "provider" if who.lower().startswith("provider") else "payer",
                   "_event": threading.Event(), "_decision": default}
-            self.pending[cp["id"]] = cp
+            with self._lock:
+                self.pending[cp["id"]] = cp
             self.log.record("checkpoint", {k: v for k, v in cp.items() if not k.startswith("_")})
-            answered = cp["_event"].wait(timeout=900)
-            self.pending.pop(cp["id"], None)
-            decision, how = cp["_decision"], ("human" if answered else "timeout default")
+            answered = cp["_event"].wait(timeout=CHECKPOINT_TIMEOUT)
+            with self._lock:
+                self.pending.pop(cp["id"], None)
+            if not answered:
+                self.log.record("decided", {"who": who, "approved": None, "how": "timed out",
+                                            "word": "NO ANSWER - task stopped"})
+                raise CheckpointTimeout(f"no answer from {who}; nothing was released or decided")
+            decision, how = cp["_decision"], "human"
         c.human_decision(who, labels[0] if decision else labels[1])
         self.log.record("decided", {"who": who, "approved": decision, "how": how,
                                     "word": labels[0] if decision else labels[1]})
@@ -160,11 +194,13 @@ class WebOversight(Oversight):
         return decision
 
     def decide(self, cid: int, approve: bool) -> bool:
-        cp = self.pending.get(cid)
-        if not cp:
-            return False
-        cp["_decision"] = bool(approve)
-        cp["_event"].set()
+        """First answer wins; later or unknown answers are rejected."""
+        with self._lock:
+            cp = self.pending.pop(cid, None)
+            if not cp:
+                return False
+            cp["_decision"] = approve
+            cp["_event"].set()
         return True
 
 
@@ -174,14 +210,14 @@ class App:
         self.log = EventLog()
         c.subscribe(self.log.on_console)
         self.oversight = WebOversight(self.log)
-        self.transport = Transport()
+        self.transport = LocalTransport()
         endpoint = "inproc://payer"
         if live_index:
             import run_demo
             from pa_demo import nanda_index as ni
             cfg = ni.load_config()
             payer_id, provider_id = (ni.agent_identity(cfg, r) for r in ("payer", "provider"))
-            inner = ni.NandaIndexClient(cfg["base_url"])
+            inner = ni.NandaIndexClient(cfg["base_url"], cache_ttl=INDEX_CACHE_TTL)
             keys = ni.STATE_DIR / "keys"
             self.index = WatchedIndex(inner, self.log)
             self.payer = PayerAgent(self.index, self.oversight, endpoint=endpoint,
@@ -212,8 +248,9 @@ class App:
                 res = {"status": "ERROR", "summary": str(e)}
             c.outcome(res["status"], res.get("summary", ""))
             self.log.record("done", {"status": res["status"], "result": res})
-            case["running"] = False
-            case["result"] = res
+            with self.log.lock:
+                case["running"] = False
+                case["result"] = res
         threading.Thread(target=work, daemon=True).start()
 
     def submit(self, patient_id: str) -> dict:
@@ -221,8 +258,10 @@ class App:
         case = self.log.new_case("provider", patient_id=patient_id, patient=p["name"],
                                  member_id=p["member_id"], service=p["service_request"]["display"],
                                  cpt=p["service_request"]["code"])
+        if case is None:
+            return None
         self._run(case, "provider", lambda: self.provider.request_prior_auth(patient_id, PAYER_ORG))
-        return case
+        return self._snap(case)
 
     def spoof(self, mode: str) -> dict:
         claimed = self.provider.AGENT_ID if mode == "impersonate" else ROGUE_ID
@@ -231,21 +270,29 @@ class App:
         case = self.log.new_case("rogue", attack=mode, patient="pt-9999 (forged)",
                                  service="MRI lumbar spine (forged note)", label=label,
                                  claimed_id=claimed)
+        if case is None:
+            return None
 
         def attack():
             payer = self.index.find("prior-auth.review", PAYER_ORG)[0]
             return SpoofedProvider(self.transport, claimed_id=claimed).attack(payer)
         self._run(case, "rogue", attack)
-        return case
+        return self._snap(case)
+
+    def _snap(self, case: dict) -> dict:
+        with self.log.lock:
+            return dict(case)
 
     def reset(self) -> bool:
-        if self.oversight.pending or any(cs["running"] for cs in self.log.cases.values()):
-            return False
+        # Same lock as new_case, so a task can't start between the check and the clear.
         with self.log.lock:
+            if self.oversight.pending or any(cs["running"] for cs in self.log.cases.values()):
+                return False
             self.log.events.clear()
             self.log.cases.clear()
-        self.transport.trace.clear()
-        self.oversight.touches.clear()
+            self.transport.trace.clear()
+            self.oversight.touches.clear()
+            self.payer.cases.clear()   # drop the insurer's copies of the clinical documents
         return True
 
     # -- views
@@ -266,14 +313,15 @@ class App:
     def state(self, since: int) -> dict:
         with self.log.lock:
             events = [e for e in self.log.events if e["seq"] > since]
-            cases = list(self.log.cases.values())
+            cases = [dict(cs) for cs in self.log.cases.values()]
         return {"events": events, "cases": cases, "auto": self.oversight.auto,
                 "pending": [k for k in self.oversight.pending]}
 
     def trace(self) -> dict:
-        return {"index": self.index.all(), "messages": self.transport.trace,
-                "human_touches": self.oversight.touches,
-                "cases": list(self.log.cases.values())}
+        with self.log.lock:
+            return {"index": self.index.all(), "messages": list(self.transport.trace),
+                    "human_touches": list(self.oversight.touches),
+                    "cases": [dict(cs) for cs in self.log.cases.values()]}
 
 
 def make_handler(app: App):
@@ -301,7 +349,12 @@ def make_handler(app: App):
             self._send(404, {"error": "not found"})
 
         def do_POST(self):  # noqa: N802
-            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return self._send(400, {"error": "bad Content-Length"})
+            if n < 0 or n > MAX_BODY:
+                return self._send(413, {"error": "request body too large"})
             try:
                 body = json.loads(self.rfile.read(n) or b"{}")
             except ValueError:
@@ -310,14 +363,20 @@ def make_handler(app: App):
             if path == "/api/submit":
                 if body.get("patient_id") not in emr.PATIENTS:
                     return self._send(400, {"error": "unknown patient"})
-                return self._send(200, app.submit(body["patient_id"]))
+                case = app.submit(body["patient_id"])
+                return self._send(200, case) if case else self._send(429, {"error": "too many tasks in flight"})
             if path == "/api/spoof":
-                return self._send(200, app.spoof(body.get("mode", "impersonate")))
+                case = app.spoof(body.get("mode", "impersonate"))
+                return self._send(200, case) if case else self._send(429, {"error": "too many tasks in flight"})
             if path == "/api/decide":
-                ok = app.oversight.decide(int(body.get("id", 0)), bool(body.get("approve")))
+                if not isinstance(body.get("approve"), bool) or not isinstance(body.get("id"), int):
+                    return self._send(400, {"error": "need integer id and boolean approve"})
+                ok = app.oversight.decide(body["id"], body["approve"])
                 return self._send(200 if ok else 409, {"ok": ok})
             if path == "/api/mode":
-                app.oversight.auto = bool(body.get("auto"))
+                if not isinstance(body.get("auto"), bool):
+                    return self._send(400, {"error": "need boolean auto"})
+                app.oversight.auto = body["auto"]
                 return self._send(200, {"auto": app.oversight.auto})
             if path == "/api/reset":
                 ok = app.reset()
@@ -338,7 +397,12 @@ def main():
     ap.add_argument("--live-index", action="store_true",
                     help="use the live NANDA Index (agents must be registered; see README)")
     ap.add_argument("--open", action="store_true", help="open the browser")
+    ap.add_argument("--allow-remote", action="store_true",
+                    help="allow a non-loopback --host (the API has no login: trusted networks only)")
     args = ap.parse_args()
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not args.allow_remote:
+        sys.exit("error: the watchtower API has no authentication, so it only binds to loopback.\n"
+                 "  Add --allow-remote to serve it on a trusted network anyway.")
     try:
         app = App(args.live_index)
     except (RuntimeError, OSError) as e:

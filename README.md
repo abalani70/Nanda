@@ -31,6 +31,11 @@ python web_app.py            # then open http://127.0.0.1:8080
 python web_app.py --live-index   # discover/verify through api.nandaindex.org instead of MockIndex
 ```
 
+The API has no login, so the server only binds to loopback; add `--allow-remote` with
+`--host 0.0.0.0` to show it on another device on a trusted network. If no one answers a
+checkpoint within 15 minutes the task stops with an error: nothing is released or decided
+on a person's behalf.
+
 Same agents, shown live in the browser. The top band is the **agent layer**: the provider agent,
 the insurer agent, the **NANDA Index** (the "DNS for agents") and a **spoofed agent**. Every signed
 message moves across the graph as a packet, and each agent shows how many it sent and received. The

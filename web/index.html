@@ -239,9 +239,18 @@ header .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);co
 .msg{box-shadow:0 2px 8px -6px rgba(16,24,40,.4)}
 h3{font-size:11px}
 @media (prefers-color-scheme: dark){header{background:linear-gradient(120deg,#0b1430 0%,#21184d 55%,#083a33 100%)}}
+.conn{position:sticky;top:0;z-index:10;background:var(--err);color:#fff;text-align:center;font-weight:600;padding:8px 16px}
+.wrapup{padding:18px;margin-top:12px}
+.wrapup .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
+.wrapup .col{border-radius:14px;padding:12px 14px;background:var(--soft)}
+.wrapup .col h4{margin:0 0 6px;font-size:13px}
+.wrapup ul{margin:0;padding-left:18px;font-size:13px}
+.wrapup li{margin:3px 0}
+@media (max-width:900px){.wrapup .g3{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="conn" id="conn" hidden>⚠️ Lost connection to the watchtower server. Retrying… (what you see may be out of date)</div>
 <div class="wrap">
   <header>
     <h1>Prior Auth Watchtower<small>Who watches the swarm? Agents do the routine work; people make the judgment calls.</small></h1>
@@ -407,6 +416,22 @@ h3{font-size:11px}
     </div>
     <div id="tl"><div class="empty">Nothing yet.</div></div>
   </section>
+
+  <section class="card wrapup">
+    <h2 style="margin:0;font-size:16px">Wrap-up</h2>
+    <div class="sub" style="color:var(--muted);font-size:12.5px">Updates live from this session.</div>
+    <div class="g3">
+      <div class="col" style="border-top:3px solid var(--ok)"><h4 style="color:var(--ok)">✅ What worked</h4><ul id="wuWorked"></ul></div>
+      <div class="col" style="border-top:3px solid var(--warn)"><h4 style="color:var(--warn)">⚠️ What didn't (yet)</h4><ul>
+        <li>Payloads are FHIR-shaped JSON, not real Da Vinci PAS bundles</li>
+        <li>Agents run on one laptop; endpoints aren't publicly hosted</li>
+        <li>Coverage policy is a single illustrative rule</li></ul></div>
+      <div class="col" style="border-top:3px solid var(--index)"><h4 style="color:var(--index)">🚀 What's next</h4><ul>
+        <li>Convert requests and decisions to Da Vinci PAS (CMS-0057-F, Jan 2027)</li>
+        <li>Host both agents on public A2A endpoints listed in the NANDA Index</li>
+        <li>Pilot with one real payer and provider pair</li></ul></div>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -486,7 +511,8 @@ async function poll(){
     setMode(st.auto, false);
     for (const ev of st.events){ fetched = Math.max(fetched, ev.seq); queue.push(ev); }
     if (firstLoad){ firstLoad = false; while (queue.length) apply(queue.shift()); render(); }
-  }catch(e){ /* server restarting: keep trying */ }
+    $("#conn").hidden = true;
+  }catch(e){ $("#conn").hidden = false; }
   setTimeout(poll, 400);
 }
 
@@ -722,6 +748,20 @@ function render(){
 
   document.querySelectorAll("[data-case]").forEach(el => el.onclick = () => { selCase = +el.dataset.case; render(); });
   renderTimeline();
+  renderWrapup(all, prov, rogue);
+}
+function renderWrapup(all, prov, rogue){
+  const msgs = all.reduce((n, c) => n + c.msgs, 0), touches = all.reduce((n, c) => n + c.touches, 0);
+  const auto = prov.filter(c => c.done && c.touches === 0).length;
+  const blocked = rogue.filter(c => c.status === "REJECTED").length;
+  const items = [
+    `Agents found each other and checked identity through the NANDA Index (${lookups.length} lookup${lookups.length === 1 ? "" : "s"})`,
+    `${msgs} signed agent-to-agent messages, ${touches} human touch${touches === 1 ? "" : "es"}`,
+    prov.length ? `${auto} of ${prov.length} request${prov.length === 1 ? "" : "s"} closed with no person involved` : "Routine requests need no person at all",
+    "People were asked only about denials and releasing more patient data",
+    rogue.length ? `${blocked} of ${rogue.length} spoofed agent${rogue.length === 1 ? "" : "s"} blocked at the identity check` : "Spoofed agents are blocked at the identity check",
+  ];
+  $("#wuWorked").innerHTML = items.map(t => `<li>${esc(t)}</li>`).join("");
 }
 function steps(c){
   const has = (k, f = () => true) => c.events.some(e => e.kind === k && f(e));
