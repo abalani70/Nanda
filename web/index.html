@@ -472,6 +472,7 @@ h1 small{font-size:12.5px}
     <section class="card panel payer side">
       <h2><span class="dot" style="background:var(--payer)"></span>Insurer oversight · Example Health Plan</h2>
       <div class="sub">The insurer's agent checks the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
+      <div class="idcard" id="payId"></div>
       <div id="payerCps"></div>
       <div class="authx" id="authx"></div>
       <h3>What the insurer agent received</h3>
@@ -899,12 +900,18 @@ function renderProvCard(){
     ${check(skillOk, skillOk ? "offers prior-auth.review, so our agent sends SendMessage" : "no prior-auth.review skill: our agent won't send")}
     <span style="color:var(--muted);font-size:11px">Our agent is an A2A <b>client</b>: it reads this card, then calls ${esc(iface.url)}.</span>`;
 }
+function identityCard(title, agentId, role){
+  const id = boot.identity, me = boot.agents.find(a => a.agent_id === agentId) || {};
+  const alg = id.alg === "ed25519" ? "Ed25519" : id.alg;
+  return `<div class="hd">🔐 ${esc(title)}</div><div class="kv">
+    <span class="k">Agent ID</span><span class="v mono">${esc(agentId)}</span>
+    <span class="k">Public key</span><span class="v">${esc(alg)} · fingerprint <span class="fp n">${esc(id.fingerprints[agentId] || "?")}</span><br>
+      <span class="mono" style="font-size:10.5px;color:var(--muted)">${esc(me.public_key || "")}</span><br>published in the NANDA Index for anyone to check</span>
+    <span class="k">Private key</span><span class="v">🔒 not shown: ${esc(id.key_storage)}. It signs every message ${esc(role)}; whoever holds it can sign as this agent.</span></div>`;
+}
 function renderIdentity(){
-  const id = boot.identity, me = boot.agents.find(a => a.agent_id === id.provider);
-  $("#provId").innerHTML = `<div class="hd">🔐 Riverside provider agent</div><div class="kv">
-    <span class="k">Agent ID</span><span class="v mono">${esc(id.provider)}</span>
-    <span class="k">Public key</span><span class="v">${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} <span class="fp n" title="${esc(me ? me.public_key : "")}">${esc(id.fingerprints[id.provider])}</span> · published in the NANDA Index</span>
-    <span class="k">Private key</span><span class="v">${esc(id.key_storage)}; signs every message</span></div>`;
+  $("#provId").innerHTML = identityCard("Riverside provider agent", boot.identity.provider, "this agent sends");
+  $("#payId").innerHTML = identityCard("Example Health Plan insurer agent", boot.identity.payer, "and decision this agent sends back");
 }
 function renderAuth(){
   const id = boot.identity, alg = id.alg === "ed25519" ? "Ed25519" : `${id.alg} (install cryptography for Ed25519)`;
