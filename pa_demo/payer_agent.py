@@ -22,6 +22,21 @@ POLICY = {
 }
 
 
+# What the insurer agent advertises on its A2A Agent Card
+A2A_DESCRIPTION = ("Reviews prior-authorization requests for Example Health Plan members. Send a "
+                   "signed PA request; the task completes with a decision, or asks for more "
+                   "documentation (TASK_STATE_INPUT_REQUIRED). Proposed denials go to a clinician.")
+A2A_SKILLS = [{
+    "id": "prior-auth.review",
+    "name": "Prior authorization review",
+    "description": "Checks a signed prior-auth request against coverage policy and returns "
+                   "APPROVED, PENDED (send more info) or DENIED (clinician-reviewed).",
+    "tags": ["prior-auth", "fhir.pas", "payer", "cms-0057-f"],
+    "inputModes": ["application/vnd.halhack.signed-envelope+json"],
+    "outputModes": ["application/vnd.halhack.signed-envelope+json", "text/plain"],
+}]
+
+
 class PayerAgent:
     AGENT_ID = "nanda:payer.example-health/prior-auth"
 
