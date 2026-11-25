@@ -267,10 +267,11 @@ h1 small{font-size:12.5px}
 .center .stat .l{font-size:11.5px}
 .center .stat::after{width:60px;height:60px;right:-16px;top:-16px}
 .center .graph{margin:0;flex:none;padding:6px 6px 0}
-.graph svg{max-height:calc(100vh - 420px);min-height:240px}
+.graph svg{max-height:calc(100vh - 612px);min-height:240px}
 .legend{padding:2px 12px 6px;gap:10px;font-size:11.5px}
 .ticker{padding:0 10px 10px;min-height:52px}
 .tx{width:200px;padding:5px 8px;font-size:11.5px}
+.center .tx .r2{display:none}
 .strip{flex:none;padding:10px 14px}
 .striphd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .striphd h2{margin:0}
@@ -321,6 +322,25 @@ h1 small{font-size:12.5px}
 .verdict{margin-top:6px;border-radius:10px;padding:7px 10px;font-weight:700;font-size:12px}
 .verdict.ok{background:var(--ok-soft);color:var(--ok)} .verdict.bad{background:var(--err-soft);color:var(--err)}
 .authx .foot{font-size:11px;color:var(--muted);margin-top:6px}
+/* ---------- authentication exchange, both directions, under the animation ---------- */
+.authrow{flex:none;padding:8px 12px}
+.authrow .ahd{display:flex;align-items:baseline;gap:10px;font-weight:750;font-size:13px;margin-bottom:4px}
+.authrow .ahd small{font-weight:500;color:var(--muted);font-size:11px}
+.arow{display:grid;grid-template-columns:118px repeat(4,minmax(0,1fr)) 150px;gap:6px;align-items:stretch;padding:4px 0;border-top:1px dashed var(--line)}
+.arow .dir{font-size:11px;font-weight:700;line-height:1.25;display:flex;flex-direction:column;justify-content:center}
+.arow .dir small{font-weight:500;color:var(--muted)}
+.arow .st{background:var(--soft);border-radius:8px;padding:4px 7px;font-size:11px;line-height:1.3;min-width:0;position:relative}
+.arow .st .lb{font-weight:700;font-size:10.5px;color:var(--muted);white-space:nowrap}
+.arow .st .mm{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--faint);white-space:nowrap}
+.arow .st.ok{background:var(--ok-soft)} .arow .st.bad{background:var(--err-soft)}
+.arow .vd{border-radius:8px;padding:4px 8px;font-size:11px;font-weight:700;display:flex;align-items:center;line-height:1.25}
+.arow .vd.ok{background:var(--ok-soft);color:var(--ok)} .arow .vd.bad{background:var(--err-soft);color:var(--err)} .arow .vd.na{background:var(--soft);color:var(--muted);font-weight:500}
+.arow .fp{font-size:10.5px}
+@media (max-width:1500px){.arow{grid-template-columns:96px repeat(4,minmax(0,1fr)) 120px}}
+.center .stat{padding:7px 12px;display:flex;align-items:baseline;gap:8px}
+.center .stat .v{font-size:20px}
+.center .stat .l{font-size:12px}
+.center .stat::after{display:none}
 </style>
 </head>
 <body>
@@ -455,6 +475,7 @@ h1 small{font-size:12.5px}
       </div>
       <div class="ticker" id="ticker"><div class="empty" style="padding:8px 0">Live transactions appear here as agents send and receive them.</div></div>
     </div>
+      <section class="card authrow" id="authx"></section>
       <section class="card panel rogue strip">
         <div class="striphd">
           <h2><span class="dot" style="background:var(--rogue)"></span>Spoofed agent</h2>
@@ -474,7 +495,6 @@ h1 small{font-size:12.5px}
       <div class="sub">The insurer's agent checks the caller in the NANDA Index and applies policy on its own. A clinician sees only proposed denials; security sees only identity failures.</div>
       <div class="idcard" id="payId"></div>
       <div id="payerCps"></div>
-      <div class="authx" id="authx"></div>
       <h3>What the insurer agent received</h3>
       <div class="inbox" id="inbox"></div>
       <div class="empty" id="inboxEmpty">Nothing received yet.</div>
@@ -913,41 +933,44 @@ function renderIdentity(){
   $("#provId").innerHTML = identityCard("Riverside provider agent", boot.identity.provider, "this agent sends");
   $("#payId").innerHTML = identityCard("Example Health Plan insurer agent", boot.identity.payer, "and decision this agent sends back");
 }
-function renderAuth(){
-  const id = boot.identity, alg = id.alg === "ed25519" ? "Ed25519" : `${id.alg} (install cryptography for Ed25519)`;
-  const inbound = verifs.filter(v => v.sender !== id.payer);
-  const v = inbound.find(x => x.case === selCase) || inbound[0];
-  const replies = verifs.filter(x => x.sender === id.payer);
-  const foot = `Replies are signed with the insurer's key <span class="fp n">${esc(id.fingerprints[id.payer])}</span> and checked by the provider agent the same way: ${replies.filter(r => r.ok).length}/${replies.length} valid.`;
+function authRow(v, dir){
+  const id = boot.identity;
+  const label = dir === "in"
+    ? `<span style="color:var(--prov)">Provider → Insurer</span><small>insurer verifies</small>`
+    : `<span style="color:var(--payer)">Insurer → Provider</span><small>provider verifies</small>`;
   if (!v){
-    $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange</div>
-      <div class="astep"><span class="n">1</span><div><div class="t">Sender signs</div>The sender signs the message bytes with its private key (${esc(alg)}); the SHA-256 shown is just a fingerprint of the message.</div></div>
-      <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A</div>The signature travels inside the A2A message.</div></div>
-      <div class="astep"><span class="n">3</span><div><div class="t">Insurer looks up the sender</div>The NANDA Index returns the public key published for that agent ID.</div></div>
-      <div class="astep"><span class="n">4</span><div><div class="t">Verify</div>The signature only checks out against the key that made it.</div></div>
-      <div class="foot">Delegate a task or launch an attack to see real values.</div>`;
-    return;
+    const why = dir === "out" && cases[selCase] && cases[selCase].kind === "rogue"
+      ? "the spoofed agent never checks replies" : "waiting for a message";
+    return `<div class="arow"><div class="dir">${label}</div>
+      <div class="st"><span class="lb">① signed with key</span><br>private key</div>
+      <div class="st"><span class="lb">② A2A message</span><br>signature inside</div>
+      <div class="st"><span class="lb">③ key in NANDA Index</span><br>public key</div>
+      <div class="st"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>sig vs key</div>
+      <div class="vd na">${esc(why)}</div></div>`;
   }
-  const s = v.signer || {}, c = cases[v.case] || {};
+  const s = v.signer || {};
   const keyMatch = !!(v.published_key && s.fingerprint && s.fingerprint === v.fingerprint);
-  const match = v.ok, cls = match ? "ok" : "bad", kcls = keyMatch ? "ok" : "bad";
+  const k = keyMatch ? "ok" : "bad", ok = v.ok;
   const claimed = boot.agents.find(a => a.agent_id === v.sender);
-  const verdict = match ? `✔ Signature valid: the message really came from ${claimed ? claimed.organization : v.sender}.`
-    : v.published_key && keyMatch ? "✘ Rejected: right key, but the signature doesn't match the message bytes (altered in transit)."
-    : v.published_key ? "✘ Rejected: it was signed with a different key than the one published for this agent ID. Forged."
-    : "✘ Rejected: no agent with this ID is published in the NANDA Index.";
-  $("#authx").innerHTML = `<div class="hd">🔐 Authentication exchange <small>task #${v.case}${c.kind === "rogue" ? " · spoofed agent" : ""} · ${esc(alg)}</small></div>
-    <div class="astep ${cls}k"><span class="n">1</span><div><div class="t">Sender signs the message</div>
-      claims to be <span class="mono">${esc(shortId(v.sender, 18))}</span><br>
-      signed with key <span class="fp ${kcls}">${esc(s.fingerprint || "?")}</span>
-      <div class="m">message SHA-256 (fingerprint) ${esc((s.digest || v.digest).slice(0, 32))}…<br>${esc(id.alg === "ed25519" ? "Ed25519" : id.alg)} signature over the message bytes ${esc((v.signature || "").slice(0, 28))}…</div></div></div>
-    <div class="astep"><span class="n">2</span><div><div class="t">Sent over A2A <span class="mono" style="font-weight:400">SendMessage</span></div>envelope ${esc(v.env_id)}</div></div>
-    <div class="astep ${v.published_key ? "" : "badd"}"><span class="n">3</span><div><div class="t">Insurer asks the NANDA Index for that agent's key</div>
-      ${v.published_key ? `published key <span class="fp ${kcls}">${esc(v.fingerprint)}</span>` : `<span class="bad-t">no record for this agent ID</span>`}</div></div>
-    <div class="astep ${cls}${cls === "ok" ? "k" : "d"}"><span class="n">4</span><div><div class="t">Verify ${esc(id.alg === "ed25519" ? "Ed25519" : "")}(signature, message bytes, published key)</div>
-      ${v.published_key ? `signer key <span class="fp ${kcls}">${esc(shortFp(s.fingerprint))}</span> ${keyMatch ? "=" : "≠"} published key <span class="fp ${kcls}">${esc(shortFp(v.fingerprint))}</span><br>signature ${match ? '<span class="ok-t">checks out</span>' : '<span class="bad-t">does not check out</span>'}` : "nothing to verify against"}</div></div>
-    <div class="verdict ${cls}">${esc(verdict)}</div>
-    <div class="foot">${foot}</div>`;
+  const verdict = ok ? `✔ genuine: ${claimed ? claimed.organization : "sender"}`
+    : !v.published_key ? "✘ unknown agent"
+    : keyMatch ? "✘ altered in transit" : "✘ forged: wrong key";
+  return `<div class="arow"><div class="dir">${label}</div>
+    <div class="st ${k}" title="claims to be ${esc(v.sender)}&#10;SHA-256 ${esc(s.digest || v.digest)}&#10;signature ${esc(v.signature)}"><span class="lb">① signed with key</span><br><span class="fp ${k}">${esc(shortFp(s.fingerprint) || "?")}</span> <span class="mm">sig ${esc((v.signature || "").slice(0, 8))}…</span></div>
+    <div class="st"><span class="lb">② A2A ${dir === "in" ? "SendMessage" : "task reply"}</span><br><span class="mono">${esc(v.env_id)}</span></div>
+    <div class="st ${v.published_key ? k : "bad"}"><span class="lb">③ key in NANDA Index</span><br>${v.published_key ? `<span class="fp ${k}">${esc(shortFp(v.fingerprint))}</span>` : '<span class="bad-t">no record</span>'}</div>
+    <div class="st ${ok ? "ok" : "bad"}"><span class="lb">④ ${id.alg === "ed25519" ? "Ed25519" : id.alg} verify</span><br>${v.published_key ? `keys ${keyMatch ? "=" : "≠"} · sig ${ok ? "✔" : "✘"}` : "nothing to check"}</div>
+    <div class="vd ${ok ? "ok" : "bad"}">${esc(verdict)}</div></div>`;
+}
+function renderAuth(){
+  const id = boot.identity;
+  const pick = list => list.find(x => x.case === selCase) || (cases[selCase] ? null : list[0]);
+  const vin = pick(verifs.filter(v => v.sender !== id.payer));
+  const vout = pick(verifs.filter(v => v.sender === id.payer));
+  const c = cases[selCase];
+  const which = c ? `task #${c.id}${c.kind === "rogue" ? " · spoofed agent" : ` · ${c.patient}`}` : "latest";
+  $("#authx").innerHTML = `<div class="ahd">🔐 Authentication exchange <small>${esc(which)} · signed, then checked against the key in the NANDA Index (hover for full values)</small></div>
+    ${authRow(vin, "in")}${authRow(vout, "out")}`;
 }
 function cpCard(cp){
   const denial = cp.labels[0] === "DENIAL CONFIRMED";
